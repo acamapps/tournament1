@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tournament</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+    }
+    h2 {
+      margin-top: 40px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 300px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Tournament Ladder</h1>
+<div id="tables"></div>
+
+<script>
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
+
+async function fetchData() {
+  const res = await fetch(SHEET_URL);
+  const text = await res.text();
+
+  const rows = text.trim().split("\n").map(r => r.split(","));
+  const headers = rows[0];
+
+  return rows.slice(1).map(row => {
+    let obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+}
+
+function groupMatches(matches) {
+  const groups = {};
+
+  matches.forEach(m => {
+    const g = m.Group;
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(m);
+  });
+
+  return groups;
+}
+
+function buildLadder(matches) {
+  const table = {};
+
+  matches.forEach(m => {
+    if (m.Played !== "TRUE") return;
+    if (!m.ScoreA || !m.ScoreB) return;
+
+    const a = m.TeamA;
+    const b = m.TeamB;
+    const sa = parseInt(m.ScoreA);
+    const sb = parseInt(m.ScoreB);
+
+    if (!table[a]) table[a] = { pts:0, for:0, against:0, played:0 };
+    if (!table[b]) table[b] = { pts:0, for:0, against:0, played:0 };
+
+    table[a].played++;
+    table[b].played++;
+
+    table[a].for += sa;
+    table[a].against += sb;
+
+    table[b].for += sb;
+    table[b].against += sa;
+
+    if (sa > sb) table[a].pts += 3;
+    else if (sb > sa) table[b].pts += 3;
+    else {
+      table[a].pts += 1;
+      table[b].pts += 1;
+    }
+  });
+
+  return Object.entries(table).map(([team, stats]) => ({
+    team,
+    ...stats,
+    diff: stats.for - stats.against
+  }));
+}
+
+function sortLadder(ladder) {
+  return ladder.sort((a, b) =>
+    b.pts - a.pts ||
+    b.diff - a.diff ||
+    b.for - a.for ||
+    a.team.localeCompare(b.team)
+  );
+}
+
+function renderGroup(name, ladder) {
+  const div = document.createElement("div");
+
+  let html = `<h2>Group ${name}</h2>`;
+  html += `<table>
+    <tr><th>Team</th><th>P</th><th>Pts</th><th>Diff</th></tr>`;
+
+  ladder.forEach(t => {
+    html += `
+      <tr>
+        <td>${t.team}</td>
+        <td>${t.played}</td>
+        <td>${t.pts}</td>
+        <td>${t.diff}</td>
+      </tr>`;
+  });
+
+  html += "</table>";
+  div.innerHTML = html;
+
+  return div;
+}
+
+async function init() {
+  const data = await fetchData();
+  const groups = groupMatches(data);
+
+  const container = document.getElementById("tables");
+  container.innerHTML = "";
+
+  Object.keys(groups).sort().forEach(groupName => {
+    const ladder = buildLadder(groups[groupName]);
+    const sorted = sortLadder(ladder);
+    container.appendChild(renderGroup(groupName, sorted));
+  });
+}
+
+init();
+setInterval(init, 5000);
+</script>
+
+</body>
+</html>
