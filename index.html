@@ -31,18 +31,46 @@
 <div id="tables"></div>
 
 <script>
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv" + "?t=" + new Date().getTime();
+// 1. Never-changing source of truth
+const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
+
+// 2. Safe fetch layer (no cache + fresh URL every time)
 async function fetchData() {
-  const res = await fetch(SHEET_URL);
+
+  // Build a fresh request URL each time
+  const url = `${BASE_URL}&_=${Date.now()}`;
+
+  const res = await fetch(url, {
+    cache: "no-store"   // critical: bypass browser cache completely
+  });
+
+  if (!res.ok) {
+    console.error("Fetch failed:", res.status);
+    return [];
+  }
+
   const text = await res.text();
 
-  const rows = text.trim().split("\n").map(r => r.split(","));
+  // Guard against empty/invalid responses
+  if (!text || text.trim().length === 0) {
+    console.error("Empty CSV response");
+    return [];
+  }
+
+  // Parse CSV safely
+  const rows = text
+    .trim()
+    .split("\n")
+    .map(r => r.split(","));
+
   const headers = rows[0];
 
   return rows.slice(1).map(row => {
-    let obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    const obj = {};
+    headers.forEach((h, i) => {
+      obj[h.trim()] = (row[i] || "").trim();
+    });
     return obj;
   });
 }
