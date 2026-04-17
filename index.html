@@ -93,7 +93,7 @@ async function fetchData() {
 
   const text = await res.text();
 
-  const rows = text.trim().split("\n").map(r => r.split(","));
+  const rows = text.trim().split("\n").map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
   const headers = rows[0];
 
   return rows.slice(1)
@@ -230,7 +230,16 @@ function renderGroup(name, ladder) {
 async function init() {
   const data = await fetchData();
 
-  const hash = JSON.stringify(data);
+  const hash = data
+  .map(r => [
+    r.Group,
+    r.TeamA,
+    r.TeamB,
+    r.ScoreA,
+    r.ScoreB,
+    r.Played
+  ].join("|"))
+  .join("~");
 
   if (hash === lastHash) return; // 🔥 stops flicker
   lastHash = hash;
