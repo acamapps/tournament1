@@ -11,15 +11,10 @@
       padding: 20px;
     }
 
-    h1 {
-      margin-bottom: 10px;
-    }
+    h1 { margin-bottom: 10px; }
 
-    .section {
-      margin-bottom: 30px;
-    }
+    .section { margin-bottom: 30px; }
 
-    /* RESULTS FEED */
     .results {
       background: white;
       padding: 15px;
@@ -33,7 +28,6 @@
       font-size: 14px;
     }
 
-    /* GROUP CARDS */
     .group {
       background: white;
       padding: 15px;
@@ -55,9 +49,7 @@
       font-size: 14px;
     }
 
-    th {
-      background: #fafafa;
-    }
+    th { background: #fafafa; }
 
     .grid {
       display: grid;
@@ -66,9 +58,7 @@
     }
 
     @media(min-width: 900px) {
-      .grid {
-        grid-template-columns: 1fr 1fr;
-      }
+      .grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -78,13 +68,15 @@
 <h1>🏆 Tournament Dashboard</h1>
 
 <div id="results" class="section results"></div>
-
 <div id="groups" class="grid section"></div>
 
 <script>
+
 const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
 let lastHash = "";
+let groupCache = {};
+
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
   const res = await fetch(BASE_URL + "&_=" + Date.now(), {
@@ -93,29 +85,31 @@ async function fetchData() {
 
   const text = await res.text();
 
-  const rows = text.trim().split("\n").map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+  const rows = text.trim()
+    .split("\n")
+    .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+
   const headers = rows[0];
 
   return rows.slice(1)
-    .filter(r => r.join("").trim() !== "") // remove blank rows
+    .filter(r => r.join("").trim() !== "")
     .map(row => {
       let obj = {};
       headers.forEach((h, i) => {
         obj[h.trim()] = (row[i] || "").trim();
       });
       return obj;
-  });
+    });
 }
 
 /* ---------------- GROUP MATCHES ---------------- */
 function groupMatches(matches) {
   const groups = {};
-
   matches.forEach(m => {
-    if (!groups[m.Group]) groups[m.Group] = [];
-    groups[m.Group].push(m);
+    const g = m.Group || "UNKNOWN";
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(m);
   });
-
   return groups;
 }
 
@@ -135,14 +129,9 @@ function buildLadder(matches) {
     if (!table[a]) table[a] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
     if (!table[b]) table[b] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
 
-    table[a].P++;
-    table[b].P++;
-
-    table[a].F += sa;
-    table[a].A += sb;
-
-    table[b].F += sb;
-    table[b].A += sa;
+    table[a].P++; table[b].P++;
+    table[a].F += sa; table[a].A += sb;
+    table[b].F += sb; table[b].A += sa;
 
     if (sa > sb) {
       table[a].W++; table[b].L++;
@@ -156,10 +145,7 @@ function buildLadder(matches) {
     }
   });
 
-  return Object.entries(table).map(([team, s]) => ({
-    team,
-    ...s
-  }));
+  return Object.entries(table).map(([team, s]) => ({ team, ...s }));
 }
 
 /* ---------------- SORT ---------------- */
@@ -172,13 +158,13 @@ function sortLadder(ladder) {
   );
 }
 
-/* ---------------- RESULTS FEED (NEWEST FIRST) ---------------- */
+/* ---------------- RESULTS FEED ---------------- */
 function renderResults(matches) {
   const el = document.getElementById("results");
 
-const completed = matches
-  .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
-  .reverse();
+  const completed = matches
+    .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
+    .reverse();
 
   let html = "<h2>Live Results</h2>";
 
@@ -192,11 +178,8 @@ const completed = matches
   el.innerHTML = html;
 }
 
-/* ---------------- RENDER GROUP ---------------- */
+/* ---------------- GROUP RENDER (NO FULL WIPE) ---------------- */
 function renderGroup(name, ladder) {
-  const div = document.createElement("div");
-  div.className = "group";
-
   let html = `<h2>Group ${name}</h2>`;
 
   html += `
@@ -221,44 +204,47 @@ function renderGroup(name, ladder) {
   });
 
   html += "</table>";
-
-  div.innerHTML = html;
-  return div;
+  return html;
 }
 
 /* ---------------- INIT ---------------- */
 async function init() {
   const data = await fetchData();
 
-  const hash = data
-  .map(r => [
-    r.Group,
-    r.TeamA,
-    r.TeamB,
-    r.ScoreA,
-    r.ScoreB,
-    r.Played
-  ].join("|"))
-  .join("~");
+  const hash = data.map(r => [
+    r.Group, r.TeamA, r.TeamB, r.ScoreA, r.ScoreB, r.Played
+  ].join("|")).join("~");
 
-  if (hash === lastHash) return; // 🔥 stops flicker
+  if (hash === lastHash) return;
   lastHash = hash;
 
   renderResults(data);
 
   const groups = groupMatches(data);
-
   const container = document.getElementById("groups");
-  container.innerHTML = "";
 
   Object.keys(groups).sort().forEach(g => {
     const ladder = sortLadder(buildLadder(groups[g]));
-    container.appendChild(renderGroup(g, ladder));
+    const html = renderGroup(g, ladder);
+
+    let el = document.getElementById("group-" + g);
+
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "group";
+      el.id = "group-" + g;
+      container.appendChild(el);
+    }
+
+    if (el.innerHTML !== html) {
+      el.innerHTML = html;
+    }
   });
 }
 
 init();
 setInterval(init, 5000);
+
 </script>
 
 </body>
