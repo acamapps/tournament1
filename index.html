@@ -178,33 +178,62 @@ function renderResults(matches) {
   el.innerHTML = html;
 }
 
-/* ---------------- GROUP RENDER (NO FULL WIPE) ---------------- */
-function renderGroup(name, ladder) {
-  let html = `<h2>Group ${name}</h2>`;
+/* ---------------- CREATE TABLE ONCE ---------------- */
+function createGroup(name, ladder) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "group";
+  wrapper.id = "group-" + name;
 
-  html += `
-  <table>
+  const title = document.createElement("h2");
+  title.textContent = "Group " + name;
+
+  const table = document.createElement("table");
+
+  table.innerHTML = `
     <tr>
       <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
       <th>F</th><th>A</th><th>Pts</th>
-    </tr>`;
+    </tr>
+  `;
+
+  const rows = {};
 
   ladder.forEach(t => {
-    html += `
-      <tr>
-        <td>${t.team}</td>
-        <td>${t.P}</td>
-        <td>${t.W}</td>
-        <td>${t.D}</td>
-        <td>${t.L}</td>
-        <td>${t.F}</td>
-        <td>${t.A}</td>
-        <td><b>${t.Pts}</b></td>
-      </tr>`;
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${t.team}</td>
+      <td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td>
+    `;
+
+    table.appendChild(tr);
+    rows[t.team] = tr;
   });
 
-  html += "</table>";
-  return html;
+  wrapper.appendChild(title);
+  wrapper.appendChild(table);
+
+  return { wrapper, rows };
+}
+
+/* ---------------- UPDATE TABLE ---------------- */
+function updateGroup(cache, ladder) {
+  ladder.forEach(t => {
+    const row = cache.rows[t.team];
+    if (!row) return;
+
+    const c = row.children;
+
+    c[0].textContent = t.team;
+    c[1].textContent = t.P;
+    c[2].textContent = t.W;
+    c[3].textContent = t.D;
+    c[4].textContent = t.L;
+    c[5].textContent = t.F;
+    c[6].textContent = t.A;
+    c[7].textContent = t.Pts;
+  });
 }
 
 /* ---------------- INIT ---------------- */
@@ -225,20 +254,13 @@ async function init() {
 
   Object.keys(groups).sort().forEach(g => {
     const ladder = sortLadder(buildLadder(groups[g]));
-    const html = renderGroup(g, ladder);
 
-    let el = document.getElementById("group-" + g);
-
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "group";
-      el.id = "group-" + g;
-      container.appendChild(el);
+    if (!groupCache[g]) {
+      groupCache[g] = createGroup(g, ladder);
+      container.appendChild(groupCache[g].wrapper);
     }
 
-    if (el.innerHTML !== html) {
-      el.innerHTML = html;
-    }
+    updateGroup(groupCache[g], ladder);
   });
 }
 
