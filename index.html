@@ -76,6 +76,7 @@ const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lG
 
 let lastHash = "";
 let groupCache = {};
+let resultsCache = [];
 
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
@@ -158,31 +159,40 @@ function sortLadder(ladder) {
   );
 }
 
-/* ---------------- RESULTS FEED ---------------- */
+/* ---------------- RESULTS (NO REBUILD) ---------------- */
 function renderResults(matches) {
-  const el = document.getElementById("results");
+  const container = document.getElementById("results");
 
   const completed = matches
     .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
     .reverse();
 
-  let html = "<h2>Live Results</h2>";
+  // rebuild only if count changed
+  if (resultsCache.length !== completed.length) {
+    container.innerHTML = "<h2>Live Results</h2>";
+    resultsCache = [];
 
-  completed.forEach(m => {
-    html += `
-      <div class="result-item">
-        <b>${m.TeamA}</b> ${m.ScoreA} - ${m.ScoreB} <b>${m.TeamB}</b>
-      </div>`;
+    completed.forEach(() => {
+      const div = document.createElement("div");
+      div.className = "result-item";
+      container.appendChild(div);
+      resultsCache.push(div);
+    });
+  }
+
+  // update text only
+  completed.forEach((m, i) => {
+    const text = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
+    if (resultsCache[i].textContent !== text) {
+      resultsCache[i].textContent = text;
+    }
   });
-
-  el.innerHTML = html;
 }
 
 /* ---------------- CREATE TABLE ONCE ---------------- */
 function createGroup(name, ladder) {
   const wrapper = document.createElement("div");
   wrapper.className = "group";
-  wrapper.id = "group-" + name;
 
   const title = document.createElement("h2");
   title.textContent = "Group " + name;
