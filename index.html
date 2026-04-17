@@ -11,10 +11,15 @@
       padding: 20px;
     }
 
-    h1 { margin-bottom: 10px; }
+    h1 {
+      margin-bottom: 10px;
+    }
 
-    .section { margin-bottom: 25px; }
+    .section {
+      margin-bottom: 30px;
+    }
 
+    /* RESULTS FEED */
     .results {
       background: white;
       padding: 15px;
@@ -28,6 +33,7 @@
       font-size: 14px;
     }
 
+    /* GROUP CARDS */
     .group {
       background: white;
       padding: 15px;
@@ -49,7 +55,9 @@
       font-size: 14px;
     }
 
-    th { background: #fafafa; }
+    th {
+      background: #fafafa;
+    }
 
     .grid {
       display: grid;
@@ -58,7 +66,9 @@
     }
 
     @media(min-width: 900px) {
-      .grid { grid-template-columns: 1fr 1fr; }
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
     }
   </style>
 </head>
@@ -68,141 +78,71 @@
 <h1>🏆 Tournament Dashboard</h1>
 
 <div id="results" class="section results"></div>
+
 <div id="groups" class="grid section"></div>
 
 <script>
+const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
-/* ================= CONFIG ================= */
-
-const BASE_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
-
-/* ================= STATE ================= */
-
-let lastGoodData = null;
 let lastHash = "";
-
-/* ================= FETCH ================= */
-
+/* ---------------- FETCH ---------------- */
 async function fetchData() {
-  const url = `${BASE_URL}&_=${Date.now()}`;
+  const res = await fetch(BASE_URL + "&_=" + Date.now(), {
+    cache: "no-store"
+  });
 
-  try {
-    const res = await fetch(url, { cache: "no-store" });
+  const text = await res.text();
 
-    if (!res.ok) {
-      console.warn("Fetch failed:", res.status);
-      return lastGoodData || [];
-    }
+  const rows = text.trim().split("\n").map(r => r.split(","));
+  const headers = rows[0];
 
-    const text = await res.text();
-    if (!text || text.length < 10) {
-      console.warn("Empty response");
-      return lastGoodData || [];
-    }
-
-    const parsed = parseCSV(text);
-
-    if (!isValidData(parsed)) {
-      console.warn("Invalid dataset received");
-      return lastGoodData || [];
-    }
-
-    return parsed;
-
-  } catch (err) {
-    console.error("Fetch error:", err);
-    return lastGoodData || [];
-  }
-}
-
-/* ================= CSV PARSER ================= */
-
-function parseCSV(text) {
-  const lines = text.trim().split("\n");
-  const headers = lines[0].split(",").map(h => h.trim());
-
-  return lines.slice(1).map(line => {
-    const cols = line.split(",");
-    const obj = {};
-
-    headers.forEach((h, i) => {
-      obj[h] = (cols[i] || "").trim();
-    });
-
-    return obj;
+  return rows.slice(1)
+    .filter(r => r.join("").trim() !== "") // remove blank rows
+    .map(row => {
+      let obj = {};
+      headers.forEach((h, i) => {
+        obj[h.trim()] = (row[i] || "").trim();
+      });
+      return obj;
   });
 }
 
-/* ================= VALIDATION ================= */
-
-function isValidData(data) {
-  if (!Array.isArray(data)) return false;
-  if (data.length < 1) return false;
-
-  const sample = data[0];
-
-  return (
-    "Group" in sample &&
-    "TeamA" in sample &&
-    "TeamB" in sample &&
-    "Played" in sample
-  );
-}
-
-/* ================= STABILITY CHECK ================= */
-
-function shouldUpdate(newData) {
-  const newHash = JSON.stringify(newData);
-
-  if (newHash === lastHash) return false; // no change → no flicker
-
-  if (lastGoodData && newData.length < lastGoodData.length) {
-    console.warn("Suspicious row drop ignored");
-    return false;
-  }
-
-  lastHash = newHash;
-  lastGoodData = newData;
-
-  return true;
-}
-
-/* ================= GROUPING ================= */
-
+/* ---------------- GROUP MATCHES ---------------- */
 function groupMatches(matches) {
   const groups = {};
 
   matches.forEach(m => {
-    const g = m.Group || "UNKNOWN";
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(m);
+    if (!groups[m.Group]) groups[m.Group] = [];
+    groups[m.Group].push(m);
   });
 
   return groups;
 }
 
-/* ================= LADDER ================= */
-
+/* ---------------- BUILD LADDER ---------------- */
 function buildLadder(matches) {
   const table = {};
 
   matches.forEach(m => {
-    const played = (m.Played || "").trim().toUpperCase();
-    if (played !== "TRUE") return;
-
-    const sa = parseInt(m.ScoreA);
-    const sb = parseInt(m.ScoreB);
-    if (isNaN(sa) || isNaN(sb)) return;
+    if ((m.Played || "").trim().toUpperCase() !== "TRUE") return;
+    if (!m.ScoreA || !m.ScoreB) return;
 
     const a = m.TeamA;
     const b = m.TeamB;
+    const sa = parseInt(m.ScoreA);
+    const sb = parseInt(m.ScoreB);
 
-    if (!table[a]) table[a] = initTeam();
-    if (!table[b]) table[b] = initTeam();
+    if (!table[a]) table[a] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
+    if (!table[b]) table[b] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
 
-    update(table[a], sa, sb);
-    update(table[b], sb, sa);
+    table[a].P++;
+    table[b].P++;
+
+    table[a].F += sa;
+    table[a].A += sb;
+
+    table[b].F += sb;
+    table[b].A += sa;
 
     if (sa > sb) {
       table[a].W++; table[b].L++;
@@ -216,21 +156,13 @@ function buildLadder(matches) {
     }
   });
 
-  return Object.entries(table).map(([team, s]) => ({ team, ...s }));
+  return Object.entries(table).map(([team, s]) => ({
+    team,
+    ...s
+  }));
 }
 
-function initTeam() {
-  return { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
-}
-
-function update(obj, f, a) {
-  obj.P++;
-  obj.F += f;
-  obj.A += a;
-}
-
-/* ================= SORT ================= */
-
+/* ---------------- SORT ---------------- */
 function sortLadder(ladder) {
   return ladder.sort((a,b) =>
     b.Pts - a.Pts ||
@@ -240,14 +172,13 @@ function sortLadder(ladder) {
   );
 }
 
-/* ================= RESULTS ================= */
-
+/* ---------------- RESULTS FEED (NEWEST FIRST) ---------------- */
 function renderResults(matches) {
   const el = document.getElementById("results");
 
-  const completed = matches
-    .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
-    .reverse();
+const completed = matches
+  .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
+  .reverse();
 
   let html = "<h2>Live Results</h2>";
 
@@ -261,8 +192,7 @@ function renderResults(matches) {
   el.innerHTML = html;
 }
 
-/* ================= GROUP RENDER ================= */
-
+/* ---------------- RENDER GROUP ---------------- */
 function renderGroup(name, ladder) {
   const div = document.createElement("div");
   div.className = "group";
@@ -296,34 +226,31 @@ function renderGroup(name, ladder) {
   return div;
 }
 
-/* ================= MAIN LOOP ================= */
-
+/* ---------------- INIT ---------------- */
 async function init() {
   const data = await fetchData();
 
-  if (!data || data.length === 0) return;
+  const hash = JSON.stringify(data);
 
-  if (!shouldUpdate(data)) return; // 🔥 prevents flicker
+  if (hash === lastHash) return; // 🔥 stops flicker
+  lastHash = hash;
 
   renderResults(data);
 
   const groups = groupMatches(data);
-  const container = document.getElementById("groups");
 
-  const fragment = document.createDocumentFragment();
+  const container = document.getElementById("groups");
+  container.innerHTML = "";
 
   Object.keys(groups).sort().forEach(g => {
     const ladder = sortLadder(buildLadder(groups[g]));
-    fragment.appendChild(renderGroup(g, ladder));
+    container.appendChild(renderGroup(g, ladder));
   });
-
-  container.innerHTML = "";
-  container.appendChild(fragment);
 }
 
 init();
 setInterval(init, 5000);
-
 </script>
+
 </body>
 </html>
