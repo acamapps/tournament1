@@ -171,9 +171,9 @@ function sortLadder(ladder) {
 function renderResults(matches) {
   const el = document.getElementById("results");
 
-  const completed = matches
-    .filter(m => m.Played === "TRUE")
-    .reverse(); // OPTION B
+const completed = matches
+  .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
+  .reverse();
 
   let html = "<h2>Live Results</h2>";
 
