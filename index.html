@@ -49,32 +49,16 @@ function renderList(container, data, fields) {
 }
 
 async function load() {
-  const matches = await fetchData("MATCHES_PLAYED");
-  const tables = await fetchData("TABLES_SORTED");
-  const semis = await fetchData("SEMIS");
-  const finals = await fetchData("FINALS");
+  const matches = await fetch(`${API_URL}?sheet=MATCHES_PLAYED`).then(r => r.json());
+  const tables = await fetch(`${API_URL}?sheet=TABLES_SORTED`).then(r => r.json());
+  const semis = await fetch(`${API_URL}?sheet=SEMIS`).then(r => r.json());
+  const finals = await fetch(`${API_URL}?sheet=FINALS`).then(r => r.json());
 
-  document.getElementById("matches").innerHTML =
-    matches.length
-      ? matches.map(m => `<div>${Object.values(m).join(" | ")}</div>`).join("")
-      : "No completed matches";
-
-  document.getElementById("tables").innerHTML =
-    tables.length
-      ? tables.map(t => `<div>${Object.values(t).join(" | ")}</div>`).join("")
-      : "No table data";
-
-  document.getElementById("semis").innerHTML =
-    semis.length
-      ? semis.map(s => `<div>${Object.values(s).join(" | ")}</div>`).join("")
-      : "TBD";
-
-  document.getElementById("finals").innerHTML =
-    finals.length
-      ? finals.map(f => `<div>${Object.values(f).join(" | ")}</div>`).join("")
-      : "TBD";
+  renderList("matches", matches, Object.keys(matches[0] || {}));
+  renderList("tables", tables, Object.keys(tables[0] || {}));
+  renderList("semis", semis, Object.keys(semis[0] || {}));
+  renderList("finals", finals, Object.keys(finals[0] || {}));
 }
-load();
 
 load();
 </script>
