@@ -77,7 +77,6 @@ const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lG
 let lastHash = "";
 let groupCache = {};
 let resultsCache = [];
-let lastTimestamp = "";
 
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
@@ -248,16 +247,26 @@ function updateGroup(cache, ladder) {
 }
 
 /* ---------------- INIT ---------------- */
+let lastDataString = "";
+
 async function init() {
   const data = await fetchData();
 
-  const timestamp = (data[0]?.TIMESTAMP || "").trim();
+  // Only track fields that matter
+  const dataString = data.map(r => [
+    (r.Group || "").trim(),
+    (r.TeamA || "").trim(),
+    (r.TeamB || "").trim(),
+    parseInt(r.ScoreA) || 0,
+    parseInt(r.ScoreB) || 0,
+    (r.Played || "").toUpperCase().trim()
+  ].join("|")).join("~");
 
-  // Only skip if we already have a timestamp AND it hasn't changed
-  if (timestamp && timestamp === lastTimestamp) return;
+  // If nothing meaningful changed → do nothing
+  if (dataString === lastDataString) return;
+  lastDataString = dataString;
 
-  lastTimestamp = timestamp;
-
+  // ✅ ONLY NOW update UI
   renderResults(data);
 
   const groups = groupMatches(data);
