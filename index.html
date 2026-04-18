@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tournament Dashboard (Clean Triggered Version)</title>
+  <title>Production Tournament Dashboard</title>
 
   <style>
     body {
@@ -71,10 +71,24 @@
       display: none;
       margin-bottom: 10px;
       padding: 10px;
-      background: #fff3cd;
-      border: 1px solid #ffeeba;
+      background: #e7f3ff;
+      border: 1px solid #b6dcff;
       border-radius: 6px;
       font-size: 14px;
+    }
+
+    .refresh-btn {
+      margin-bottom: 15px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #2d6cdf;
+      color: white;
+      cursor: pointer;
+    }
+
+    .refresh-btn:hover {
+      background: #1f56b3;
     }
   </style>
 </head>
@@ -83,8 +97,12 @@
 
 <h1>🏆 Tournament Dashboard</h1>
 
+<button class="refresh-btn" onclick="manualRefresh()">
+  🔄 Refresh Dashboard
+</button>
+
 <div id="updateBanner">
-  🟡 Update received from Google Sheets
+  🟢 Updated from Google Sheets
 </div>
 
 <div id="results" class="section results">
@@ -99,14 +117,9 @@ const BASE_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
 /* ---------------- STATE ---------------- */
-let lastTrigger = "";
 let isRefreshing = false;
 
-/* ---------------- KEYED STORAGE ---------------- */
-let resultMap = {};
-let groupMap = {};
-
-/* ---------------- FETCH ---------------- */
+/* ---------------- FETCH SNAPSHOT ---------------- */
 async function fetchData() {
   const res = await fetch(BASE_URL + "&_=" + Date.now(), {
     cache: "no-store"
@@ -131,67 +144,26 @@ async function fetchData() {
     });
 }
 
-/* ---------------- RESULTS (NO DIFF LOGIC) ---------------- */
+/* ---------------- FULL SNAPSHOT RENDER (RESULTS) ---------------- */
 function renderResults(matches) {
   const container = document.getElementById("results");
 
-  if (!container.dataset.init) {
-    container.innerHTML = "<h2>Live Results</h2>";
-    container.dataset.init = "true";
-  }
+  container.innerHTML = "<h2>Live Results</h2>";
 
-  const seen = new Set();
-
-  // STEP 1: build/update all valid matches
-  matches.forEach(m => {
-    const id = m.MatchID;
-    seen.add(id);
-
-    let entry = resultMap[id];
-
-    // create node if missing
-    if (!entry) {
+  matches
+    .filter(m => String(m.Played || "").toUpperCase() === "TRUE")
+    .forEach(m => {
       const div = document.createElement("div");
       div.className = "result-item";
+      div.textContent = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
       container.appendChild(div);
-
-      entry = {
-        el: div,
-        data: m
-      };
-
-      resultMap[id] = entry;
-    } else {
-      entry.data = m;
-    }
-
-    const isPlayed = String(m.Played || "").toUpperCase() === "TRUE";
-
-    if (!isPlayed) {
-      entry.el.classList.add("hidden");
-      entry.el.textContent = "";
-    } else {
-      entry.el.classList.remove("hidden");
-      entry.el.textContent =
-        `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
-    }
-  });
-
-  // STEP 2: HARD CLEANUP (THIS IS WHAT STOPS DUPLICATES)
-  Object.keys(resultMap).forEach(id => {
-    if (!seen.has(id)) {
-      resultMap[id].el.remove();
-      delete resultMap[id];
-    }
-  });
+    });
 }
 
-/* ---------------- GROUPS (FULL REWRITE ON REFRESH ONLY) ---------------- */
+/* ---------------- FULL SNAPSHOT RENDER (GROUPS) ---------------- */
 function renderGroups(matches) {
   const container = document.getElementById("groups");
-
-  container.innerHTML = ""; // full reset on refresh only
-  groupMap = {};
+  container.innerHTML = "";
 
   const groups = {};
 
@@ -245,21 +217,19 @@ function renderGroups(matches) {
       }
     });
 
-    const ladder = Object.entries(table).map(([team, s]) => ({ team, ...s }));
-
-    ladder.forEach(t => {
+    Object.entries(table).forEach(([team, s]) => {
       const row = document.createElement("div");
       row.className = "grid-row";
 
       row.innerHTML = `
-        <div>${t.team}</div>
-        <div>${t.P}</div>
-        <div>${t.W}</div>
-        <div>${t.D}</div>
-        <div>${t.L}</div>
-        <div>${t.F}</div>
-        <div>${t.A}</div>
-        <div>${t.Pts}</div>
+        <div>${team}</div>
+        <div>${s.P}</div>
+        <div>${s.W}</div>
+        <div>${s.D}</div>
+        <div>${s.L}</div>
+        <div>${s.F}</div>
+        <div>${s.A}</div>
+        <div>${s.Pts}</div>
       `;
 
       grid.appendChild(row);
@@ -271,7 +241,7 @@ function renderGroups(matches) {
   });
 }
 
-/* ---------------- MANUAL REFRESH (ONLY ENTRY POINT) ---------------- */
+/* ---------------- SINGLE ENTRY POINT ---------------- */
 async function manualRefresh() {
   if (isRefreshing) return;
   isRefreshing = true;
@@ -282,31 +252,19 @@ async function manualRefresh() {
     renderResults(data);
     renderGroups(data);
 
-    document.getElementById("updateBanner").style.display = "none";
+    const banner = document.getElementById("updateBanner");
+    banner.style.display = "block";
+
+    setTimeout(() => {
+      banner.style.display = "none";
+    }, 1500);
+
   } finally {
     isRefreshing = false;
   }
 }
 
-/* ---------------- TRIGGER CHECK (Z1 ONLY, NO DATA COMPARISON) ---------------- */
-const TRIGGER_URL = "YOUR_WEB_APP_URL_HERE";
-
-let lastTrigger = "";
-
-async function checkTrigger() {
-  const res = await fetch(TRIGGER_URL + "?t=" + Date.now());
-  const text = (await res.text()).trim();
-
-  if (!text || text === lastTrigger) return;
-
-  lastTrigger = text;
-
-  document.getElementById("updateBanner").style.display = "block";
-
-  manualRefresh();
-}
-
-/* ---------------- START ---------------- */
+/* ---------------- INIT ---------------- */
 manualRefresh();
 
 </script>
