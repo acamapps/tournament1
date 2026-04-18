@@ -77,6 +77,7 @@ const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lG
 let lastHash = "";
 let groupCache = {};
 let resultsCache = [];
+let lastTimestamp = "";
 
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
@@ -250,12 +251,10 @@ function updateGroup(cache, ladder) {
 async function init() {
   const data = await fetchData();
 
-  const hash = data.map(r => [
-    r.Group, r.TeamA, r.TeamB, r.ScoreA, r.ScoreB, r.Played
-  ].join("|")).join("~");
+  const timestamp = data[0]?.Timestamp || "";
 
-  if (hash === lastHash) return;
-  lastHash = hash;
+  if (timestamp === lastTimestamp) return;
+  lastTimestamp = timestamp;
 
   renderResults(data);
 
