@@ -140,35 +140,49 @@ function renderResults(matches) {
     container.dataset.init = "true";
   }
 
-  // overwrite state completely (no comparisons, no diffing)
-  resultMap = {};
+  const seen = new Set();
 
+  // STEP 1: build/update all valid matches
   matches.forEach(m => {
     const id = m.MatchID;
+    seen.add(id);
 
-    if (!resultMap[id]) {
+    let entry = resultMap[id];
+
+    // create node if missing
+    if (!entry) {
       const div = document.createElement("div");
       div.className = "result-item";
       container.appendChild(div);
 
-      resultMap[id] = {
+      entry = {
         el: div,
         data: m
       };
+
+      resultMap[id] = entry;
+    } else {
+      entry.data = m;
     }
 
     const isPlayed = String(m.Played || "").toUpperCase() === "TRUE";
 
-    const el = resultMap[id].el;
-
     if (!isPlayed) {
-      el.classList.add("hidden");
-      el.textContent = "";
-      return;
+      entry.el.classList.add("hidden");
+      entry.el.textContent = "";
+    } else {
+      entry.el.classList.remove("hidden");
+      entry.el.textContent =
+        `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
     }
+  });
 
-    el.classList.remove("hidden");
-    el.textContent = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
+  // STEP 2: HARD CLEANUP (THIS IS WHAT STOPS DUPLICATES)
+  Object.keys(resultMap).forEach(id => {
+    if (!seen.has(id)) {
+      resultMap[id].el.remove();
+      delete resultMap[id];
+    }
   });
 }
 
