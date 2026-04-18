@@ -1,67 +1,27 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Tournament Dashboard</title>
-  <style>
-    body { font-family: Arial; background:#111; color:#fff; }
-    .card { background:#222; padding:15px; margin:10px; border-radius:10px; }
-    h2 { border-bottom:1px solid #444; padding-bottom:5px; }
-  </style>
-</head>
-<body>
-
-<div class="card">
-  <h2>Completed Matches</h2>
-  <div id="matches"></div>
-</div>
-
-<div class="card">
-  <h2>Tables</h2>
-  <div id="tables"></div>
-</div>
-
-<div class="card">
-  <h2>Semi Finals</h2>
-  <div id="semis"></div>
-</div>
-
-<div class="card">
-  <h2>Final</h2>
-  <div id="finals"></div>
-</div>
-
-<script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzLI5ABpNRquECkF-n343QfJToKmXgUV5bW9c9_bo4n5riaYZM7g65UuztcOanOUPznCQ/exec";
-
-async function fetchData(endpoint) {
-  const res = await fetch(`${API_URL}?sheet=${endpoint}`);
-  return res.json();
-}
-
-function renderList(container, data, fields) {
-  let html = "";
-  data.forEach(row => {
-    html += `<div>`;
-    fields.forEach(f => html += `${row[f]} `);
-    html += `</div>`;
-  });
-  document.getElementById(container).innerHTML = html;
-}
-
 async function load() {
-  const matches = await fetch(`${API_URL}?sheet=MATCHES_PLAYED`).then(r => r.json());
-  const tables = await fetch(`${API_URL}?sheet=TABLES_SORTED`).then(r => r.json());
-  const semis = await fetch(`${API_URL}?sheet=SEMIS`).then(r => r.json());
-  const finals = await fetch(`${API_URL}?sheet=FINALS`).then(r => r.json());
+  const matches = await fetchData("MATCHES_PLAYED");
+  const tables = await fetchData("TABLES_SORTED");
+  const semis = await fetchData("SEMIS");
+  const finals = await fetchData("FINALS");
 
-  renderList("matches", matches, Object.keys(matches[0] || {}));
-  renderList("tables", tables, Object.keys(tables[0] || {}));
-  renderList("semis", semis, Object.keys(semis[0] || {}));
-  renderList("finals", finals, Object.keys(finals[0] || {}));
+  document.getElementById("matches").innerHTML =
+    matches.length
+      ? matches.map(m => `<div>${Object.values(m).join(" | ")}</div>`).join("")
+      : "No completed matches";
+
+  document.getElementById("tables").innerHTML =
+    tables.length
+      ? tables.map(t => `<div>${Object.values(t).join(" | ")}</div>`).join("")
+      : "No table data";
+
+  document.getElementById("semis").innerHTML =
+    semis.length
+      ? semis.map(s => `<div>${Object.values(s).join(" | ")}</div>`).join("")
+      : "TBD";
+
+  document.getElementById("finals").innerHTML =
+    finals.length
+      ? finals.map(f => `<div>${Object.values(f).join(" | ")}</div>`).join("")
+      : "TBD";
 }
-
 load();
-</script>
-
-</body>
-</html>
