@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tournament Dashboard (MatchID Stable)</title>
+  <title>Tournament Dashboard (Trigger-Based)</title>
 
   <style>
     body {
@@ -76,16 +76,6 @@
       border-radius: 6px;
       font-size: 14px;
     }
-
-    button {
-      padding: 6px 10px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-      margin-left: 10px;
-    }
   </style>
 </head>
 
@@ -94,8 +84,7 @@
 <h1>🏆 Tournament Dashboard</h1>
 
 <div id="updateBanner">
-  🟡 New updates available
-  <button onclick="manualRefresh()">Refresh</button>
+  🟡 New update received from Google Sheets
 </div>
 
 <div id="results" class="section results">
@@ -110,11 +99,9 @@ const BASE_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
 /* ---------------- STATE ---------------- */
-let lastHash = "";
-
-/* ---------------- KEYED STORAGE ---------------- */
-let resultMap = {};   // MatchID → DOM node + data
-let groupMap = {};    // Group → DOM structure
+let lastTrigger = "";
+let resultMap = {};
+let groupMap = {};
 
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
@@ -141,14 +128,7 @@ async function fetchData() {
     });
 }
 
-/* ---------------- HASH ---------------- */
-function createHash(data) {
-  return data.map(r =>
-    `${r.MatchID}|${r.Group}|${r.TeamA}|${r.TeamB}|${r.ScoreA}|${r.ScoreB}|${r.Played}`
-  ).join("~");
-}
-
-/* ---------------- RESULTS (MATCHID KEYED, NO FILTER REBUILD) ---------------- */
+/* ---------------- INIT RESULTS ---------------- */
 function initResults(matches) {
   const container = document.getElementById("results");
 
@@ -163,7 +143,6 @@ function initResults(matches) {
     if (!resultMap[id]) {
       const div = document.createElement("div");
       div.className = "result-item";
-
       container.appendChild(div);
 
       resultMap[id] = {
@@ -171,19 +150,19 @@ function initResults(matches) {
         data: m
       };
     } else {
-      resultMap[id].data = m; // update state only
+      resultMap[id].data = m;
     }
   });
 }
 
-/* ---------------- UPDATE RESULTS (NO STRUCTURE CHANGE) ---------------- */
+/* ---------------- UPDATE RESULTS ---------------- */
 function updateResults() {
   Object.values(resultMap).forEach(r => {
     const m = r.data;
 
-    const isPlayed = String(m.Played || "").toUpperCase() === "TRUE";
+    const played = String(m.Played || "").toUpperCase() === "TRUE";
 
-    if (!isPlayed) {
+    if (!played) {
       r.el.classList.add("hidden");
       return;
     }
@@ -195,7 +174,7 @@ function updateResults() {
   });
 }
 
-/* ---------------- GROUPS (MATCHID SAFE) ---------------- */
+/* ---------------- GROUPS ---------------- */
 function updateGroups(matches) {
   const container = document.getElementById("groups");
 
@@ -207,7 +186,7 @@ function updateGroups(matches) {
     groups[g].push(m);
   });
 
-  Object.keys(groups).sort().forEach(g => {
+  Object.keys(groups).forEach(g => {
     const list = groups[g];
 
     if (!groupMap[g]) {
@@ -219,14 +198,13 @@ function updateGroups(matches) {
 
       const grid = document.createElement("div");
 
-      const header = document.createElement("div");
-      header.className = "grid-header";
-      header.innerHTML = `
-        <div>Team</div><div>P</div><div>W</div><div>D</div>
-        <div>L</div><div>F</div><div>A</div><div>Pts</div>
+      grid.innerHTML = `
+        <div class="grid-header">
+          <div>Team</div><div>P</div><div>W</div><div>D</div>
+          <div>L</div><div>F</div><div>A</div><div>Pts</div>
+        </div>
       `;
 
-      grid.appendChild(header);
       wrapper.appendChild(title);
       wrapper.appendChild(grid);
       container.appendChild(wrapper);
@@ -271,7 +249,9 @@ function updateGroups(matches) {
         const row = document.createElement("div");
         row.className = "grid-row";
 
-        row.innerHTML = `<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>`;
+        row.innerHTML =
+          `<div></div><div></div><div></div><div></div>` +
+          `<div></div><div></div><div></div><div></div>`;
 
         gNode.grid.appendChild(row);
         gNode.rows[key] = row;
@@ -291,11 +271,9 @@ function updateGroups(matches) {
   });
 }
 
-/* ---------------- CONTROL FLOW ---------------- */
+/* ---------------- MANUAL REFRESH (ONLY ENTRY POINT) ---------------- */
 async function manualRefresh() {
   const data = await fetchData();
-
-  lastHash = createHash(data);
 
   initResults(data);
   updateResults();
@@ -304,337 +282,25 @@ async function manualRefresh() {
   document.getElementById("updateBanner").style.display = "none";
 }
 
-async function checkForUpdates() {
-  const data = await fetchData();
-  const hash = createHash(data);
+/* ---------------- TRIGGER CHECK (ONLY CELL Z1) ---------------- */
+async function checkTrigger() {
+  const res = await fetch(BASE_URL + "&range=Z1");
+  const text = await res.text();
 
-  if (hash !== lastHash) {
-    lastHash = hash;
+  const trigger = text.trim();
+
+  if (trigger && trigger !== lastTrigger) {
+    lastTrigger = trigger;
+
     document.getElementById("updateBanner").style.display = "block";
+
+    manualRefresh();
   }
 }
 
 /* ---------------- START ---------------- */
 manualRefresh();
-setInterval(checkForUpdates, 15000);
-
-</script>
-
-</body>
-</html><!DOCTYPE html>
-<html>
-<head>
-  <title>Tournament Dashboard (No Flicker State Model)</title>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f6f7fb;
-      margin: 0;
-      padding: 20px;
-    }
-
-    h1 { margin-bottom: 10px; }
-
-    .section { margin-bottom: 30px; }
-
-    .results {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .result-item {
-      padding: 6px 0;
-      border-bottom: 1px solid #eee;
-      font-size: 14px;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
-
-    @media(min-width: 900px) {
-      .grid { grid-template-columns: 1fr 1fr; }
-    }
-
-    .group {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .grid-header, .grid-row {
-      display: grid;
-      grid-template-columns: 2fr repeat(7, 1fr);
-      padding: 6px 0;
-      align-items: center;
-    }
-
-    .grid-header {
-      font-weight: bold;
-      border-bottom: 2px solid #ddd;
-      background: #fafafa;
-    }
-
-    .grid-row {
-      border-bottom: 1px solid #eee;
-      font-size: 14px;
-    }
-
-    #updateBanner {
-      display: none;
-      margin-bottom: 10px;
-      padding: 10px;
-      background: #fff3cd;
-      border: 1px solid #ffeeba;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    button {
-      padding: 6px 10px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-      margin-left: 10px;
-    }
-  </style>
-</head>
-
-<body>
-
-<h1>🏆 Tournament Dashboard</h1>
-
-<div id="updateBanner">
-  🟡 New updates available
-  <button onclick="manualRefresh()">Refresh</button>
-</div>
-
-<div id="results" class="section results">
-  <h2>Live Results</h2>
-</div>
-
-<div id="groups" class="grid section"></div>
-
-<script>
-
-const BASE_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
-
-/* ---------------- STATE ---------------- */
-let lastHash = "";
-
-/* ---------------- DATA MAPS (KEYED LOCKING) ---------------- */
-let resultMap = {};        // matchKey → DOM node
-let groupMap = {};         // group → DOM structure
-let teamRows = {};         // group:team → row element
-
-/* ---------------- FETCH ---------------- */
-async function fetchData() {
-  const res = await fetch(BASE_URL + "&_=" + Date.now(), {
-    cache: "no-store"
-  });
-
-  const text = await res.text();
-
-  const rows = text.trim()
-    .split("\n")
-    .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
-
-  const headers = rows[0];
-
-  return rows.slice(1)
-    .filter(r => r.join("").trim() !== "")
-    .map(row => {
-      let obj = {};
-      headers.forEach((h, i) => obj[h.trim()] = (row[i] || "").trim());
-      return obj;
-    });
-}
-
-/* ---------------- HASH ---------------- */
-function createHash(data) {
-  return data.map(r =>
-    `${r.Group}|${r.TeamA}|${r.TeamB}|${r.ScoreA}|${r.ScoreB}|${r.Played}`
-  ).join("~");
-}
-
-/* ---------------- INITIAL BUILD (NO FILTERING EVER AGAIN) ---------------- */
-function initResults(matches) {
-  const container = document.getElementById("results");
-
-  if (!container.dataset.init) {
-    container.innerHTML = "<h2>Live Results</h2>";
-    container.dataset.init = "true";
-  }
-
-  matches.forEach(m => {
-    const key = m.TeamA + "-" + m.TeamB;
-
-    if (!resultMap[key]) {
-      const div = document.createElement("div");
-      div.className = "result-item";
-      container.appendChild(div);
-
-      resultMap[key] = {
-        el: div,
-        data: m
-      };
-    }
-  });
-}
-
-/* ---------------- UPDATE RESULTS (NO REBUILD, ONLY TOGGLE) ---------------- */
-function updateResults() {
-  Object.values(resultMap).forEach(r => {
-    const m = r.data;
-
-    const isPlayed = String(m.Played || "").toUpperCase() === "TRUE";
-
-    if (isPlayed) {
-      r.el.classList.remove("hidden");
-      r.el.textContent =
-        `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
-    } else {
-      r.el.classList.add("hidden");
-    }
-  });
-}
-
-/* ---------------- GROUPS (KEYED, NO REBUILD) ---------------- */
-function updateGroups(matches) {
-  const container = document.getElementById("groups");
-
-  const groups = {};
-
-  matches.forEach(m => {
-    const g = m.Group || "UNKNOWN";
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(m);
-  });
-
-  Object.keys(groups).sort().forEach(g => {
-    const matches = groups[g];
-
-    const table = {};
-
-    matches.forEach(m => {
-      if (String(m.Played || "").toUpperCase() !== "TRUE") return;
-
-      const a = m.TeamA;
-      const b = m.TeamB;
-      const sa = +m.ScoreA || 0;
-      const sb = +m.ScoreB || 0;
-
-      if (!table[a]) table[a] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
-      if (!table[b]) table[b] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
-
-      table[a].P++; table[b].P++;
-      table[a].F += sa; table[a].A += sb;
-      table[b].F += sb; table[b].A += sa;
-
-      if (sa > sb) {
-        table[a].W++; table[b].L++; table[a].Pts += 3;
-      } else if (sb > sa) {
-        table[b].W++; table[a].L++; table[b].Pts += 3;
-      } else {
-        table[a].D++; table[b].D++; table[a].Pts++; table[b].Pts++;
-      }
-    });
-
-    const ladder = Object.entries(table).map(([team, s]) => ({ team, ...s }));
-
-    if (!groupMap[g]) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "group";
-
-      const title = document.createElement("h2");
-      title.textContent = "Group " + g;
-
-      const grid = document.createElement("div");
-
-      const header = document.createElement("div");
-      header.className = "grid-header";
-      header.innerHTML = `
-        <div>Team</div><div>P</div><div>W</div><div>D</div>
-        <div>L</div><div>F</div><div>A</div><div>Pts</div>
-      `;
-
-      grid.appendChild(header);
-      wrapper.appendChild(title);
-      wrapper.appendChild(grid);
-      container.appendChild(wrapper);
-
-      groupMap[g] = { grid, rows: {} };
-    }
-
-    const gNode = groupMap[g];
-
-    ladder.forEach(t => {
-      const key = g + ":" + t.team;
-
-      if (!gNode.rows[key]) {
-        const row = document.createElement("div");
-        row.className = "grid-row";
-
-        row.innerHTML = `<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>`;
-
-        gNode.grid.appendChild(row);
-        gNode.rows[key] = row;
-      }
-
-      const r = gNode.rows[key].children;
-
-      r[0].textContent = t.team;
-      r[1].textContent = t.P;
-      r[2].textContent = t.W;
-      r[3].textContent = t.D;
-      r[4].textContent = t.L;
-      r[5].textContent = t.F;
-      r[6].textContent = t.A;
-      r[7].textContent = t.Pts;
-    });
-  });
-}
-
-/* ---------------- CONTROL ---------------- */
-async function manualRefresh() {
-  const data = await fetchData();
-
-  lastHash = createHash(data);
-
-  initResults(data);
-  updateResults();
-  updateGroups(data);
-
-  document.getElementById("updateBanner").style.display = "none";
-}
-
-/* ---------------- CHANGE DETECTION ---------------- */
-async function checkForUpdates() {
-  const data = await fetchData();
-  const hash = createHash(data);
-
-  if (hash !== lastHash) {
-    lastHash = hash;
-    document.getElementById("updateBanner").style.display = "block";
-  }
-}
-
-/* ---------------- INIT ---------------- */
-manualRefresh();
-setInterval(checkForUpdates, 15000);
+setInterval(checkTrigger, 3000);
 
 </script>
 
