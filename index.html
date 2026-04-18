@@ -84,15 +84,17 @@ function renderGrid(data) {
 // Load all sections
 async function loadDashboard() {
   try {
-    const matches = await fetchRange("MATCHES_PLAYED", "A1:E6");
-    const tables = await fetchRange("TABLES_SORTED", "A1:E6");
-    const semis = await fetchRange("SEMIS", "A1:E6");
-    const finals = await fetchRange("FINALS", "A1:E6");
+    const matches = await fetchRange("MATCHES_PLAYED", "A1:F13");
+    const tables = await fetchRange("TABLES_SORTED", "A1:I15");
+    const semis = await fetchRange("SEMIS", "A1:E5");
+    const finals = await fetchRange("FINALS", "A1:E5");
+    const results = await fetchRange("RESULTS_DATA", "A1:A8");
 
     document.getElementById("matches").innerHTML = renderGrid(matches);
     document.getElementById("tables").innerHTML = renderGrid(tables);
     document.getElementById("semis").innerHTML = renderGrid(semis);
     document.getElementById("finals").innerHTML = renderGrid(finals);
+    document.getElementById("results").innerHTML = renderGrid(results);
 
   } catch (err) {
     console.error("Dashboard error:", err);
