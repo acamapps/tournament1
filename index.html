@@ -287,10 +287,13 @@ async function checkTrigger() {
   const res = await fetch(BASE_URL + "&range=Z1");
   const text = await res.text();
 
-  const trigger = text.trim();
+  const triggerValue = text.trim();
 
-  if (trigger && trigger !== lastTrigger) {
-    lastTrigger = trigger;
+  if (!triggerValue) return;
+
+  // ONLY react to real increments
+  if (triggerValue !== lastTrigger) {
+    lastTrigger = triggerValue;
 
     document.getElementById("updateBanner").style.display = "block";
 
