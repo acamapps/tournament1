@@ -251,9 +251,11 @@ function updateGroup(cache, ladder) {
 async function init() {
   const data = await fetchData();
 
-  const timestamp = data[0]?.Timestamp || "";
+  const timestamp = data[0]?.Timestamp || null;
 
-  if (timestamp === lastTimestamp) return;
+  // Only skip if we already have a timestamp AND it hasn't changed
+  if (timestamp && timestamp === lastTimestamp) return;
+
   lastTimestamp = timestamp;
 
   renderResults(data);
