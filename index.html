@@ -1,289 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tournament Dashboard (Hard-Locked)</title>
-
+  <title>Tournament Dashboard</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f6f7fb;
-      margin: 0;
-      padding: 20px;
-    }
-
-    h1 { margin-bottom: 10px; }
-
-    .section { margin-bottom: 30px; }
-
-    .results {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .result-item {
-      padding: 6px 0;
-      border-bottom: 1px solid #eee;
-      font-size: 14px;
-    }
-
-    .hidden { display: none; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
-
-    @media(min-width: 900px) {
-      .grid { grid-template-columns: 1fr 1fr; }
-    }
-
-    .group {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .grid-header, .grid-row {
-      display: grid;
-      grid-template-columns: 2fr repeat(7, 1fr);
-      padding: 6px 0;
-      align-items: center;
-    }
-
-    .grid-header {
-      font-weight: bold;
-      border-bottom: 2px solid #ddd;
-      background: #fafafa;
-    }
-
-    .grid-row {
-      border-bottom: 1px solid #eee;
-      font-size: 14px;
-    }
-
-    #updateBanner {
-      display: none;
-      margin-bottom: 10px;
-      padding: 10px;
-      background: #e7f3ff;
-      border: 1px solid #b6dcff;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    .refresh-btn {
-      margin-bottom: 15px;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 6px;
-      background: #2d6cdf;
-      color: white;
-      cursor: pointer;
-    }
-
-    .refresh-btn:hover {
-      background: #1f56b3;
-    }
+    body { font-family: Arial; background:#111; color:#fff; }
+    .card { background:#222; padding:15px; margin:10px; border-radius:10px; }
+    h2 { border-bottom:1px solid #444; padding-bottom:5px; }
   </style>
 </head>
-
 <body>
 
-<h1>🏆 Tournament Dashboard</h1>
-
-<button class="refresh-btn" onclick="manualRefresh()">
-  🔄 Refresh Dashboard
-</button>
-
-<div id="updateBanner">🟢 Updated from Google Sheets</div>
-
-<div id="results" class="section results">
-  <h2>Live Results</h2>
+<div class="card">
+  <h2>Completed Matches</h2>
+  <div id="matches"></div>
 </div>
 
-<div id="groups" class="grid section"></div>
+<div class="card">
+  <h2>Tables</h2>
+  <div id="tables"></div>
+</div>
+
+<div class="card">
+  <h2>Semi Finals</h2>
+  <div id="semis"></div>
+</div>
+
+<div class="card">
+  <h2>Final</h2>
+  <div id="finals"></div>
+</div>
 
 <script>
+const API_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
 
-/* ---------------- CONFIG ---------------- */
-const BASE_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
-
-/* ---------------- HARD LOCK: SINGLE INSTANCE ---------------- */
-const INSTANCE_ID = Math.random().toString(36).substring(2);
-localStorage.setItem("dashboardInstance", INSTANCE_ID);
-
-function isActiveInstance() {
-  return localStorage.getItem("dashboardInstance") === INSTANCE_ID;
+async function fetchData(endpoint) {
+  const res = await fetch(`${API_URL}?sheet=${endpoint}`);
+  return res.json();
 }
 
-/* ---------------- STATE ---------------- */
-let isRefreshing = false;
-
-/* ---------------- FETCH (CACHE SAFE) ---------------- */
-async function fetchData() {
-  const res = await fetch(BASE_URL + "&_=" + Date.now(), {
-    cache: "no-store",
-    headers: {
-      "Cache-Control": "no-cache"
-    }
+function renderList(container, data, fields) {
+  let html = "";
+  data.forEach(row => {
+    html += `<div>`;
+    fields.forEach(f => html += `${row[f]} `);
+    html += `</div>`;
   });
-
-  const text = await res.text();
-
-  const rows = text.trim()
-    .split("\n")
-    .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
-
-  const headers = rows[0];
-
-  return rows.slice(1)
-    .filter(r => r.join("").trim() !== "")
-    .map(row => {
-      let obj = {};
-      headers.forEach((h, i) => {
-        obj[h.trim()] = (row[i] || "").trim();
-      });
-      return obj;
-    });
+  document.getElementById(container).innerHTML = html;
 }
 
-/* ---------------- SAFE BOOLEAN ---------------- */
-function isPlayed(row) {
-  return String(row.Played || "")
-    .trim()
-    .toUpperCase() === "TRUE";
+async function load() {
+  const matches = await fetch(`${API_URL}?sheet=MATCHES_PLAYED`).then(r => r.json());
+  const tables = await fetch(`${API_URL}?sheet=TABLES_SORTED`).then(r => r.json());
+  const semis = await fetch(`${API_URL}?sheet=SEMIS`).then(r => r.json());
+  const finals = await fetch(`${API_URL}?sheet=FINALS`).then(r => r.json());
+
+  renderList("matches", matches, Object.keys(matches[0] || {}));
+  renderList("tables", tables, Object.keys(tables[0] || {}));
+  renderList("semis", semis, Object.keys(semis[0] || {}));
+  renderList("finals", finals, Object.keys(finals[0] || {}));
 }
 
-/* ---------------- FULL SNAPSHOT: RESULTS ---------------- */
-function renderResults(matches) {
-  const container = document.getElementById("results");
-
-  container.innerHTML = "<h2>Live Results</h2>";
-
-  matches
-    .filter(isPlayed)
-    .forEach(m => {
-      const div = document.createElement("div");
-      div.className = "result-item";
-      div.textContent = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
-      container.appendChild(div);
-    });
-}
-
-/* ---------------- FULL SNAPSHOT: GROUPS ---------------- */
-function renderGroups(matches) {
-  const container = document.getElementById("groups");
-  container.innerHTML = "";
-
-  const groups = {};
-
-  matches.forEach(m => {
-    const g = m.Group || "UNKNOWN";
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(m);
-  });
-
-  Object.keys(groups).forEach(g => {
-    const list = groups[g];
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "group";
-
-    const title = document.createElement("h2");
-    title.textContent = "Group " + g;
-
-    const grid = document.createElement("div");
-
-    grid.innerHTML = `
-      <div class="grid-header">
-        <div>Team</div><div>P</div><div>W</div><div>D</div>
-        <div>L</div><div>F</div><div>A</div><div>Pts</div>
-      </div>
-    `;
-
-    const table = {};
-
-    list.forEach(m => {
-      if (!isPlayed(m)) return;
-
-      const a = m.TeamA;
-      const b = m.TeamB;
-      const sa = +m.ScoreA || 0;
-      const sb = +m.ScoreB || 0;
-
-      if (!table[a]) table[a] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
-      if (!table[b]) table[b] = { P:0,W:0,D:0,L:0,F:0,A:0,Pts:0 };
-
-      table[a].P++; table[b].P++;
-      table[a].F += sa; table[a].A += sb;
-      table[b].F += sb; table[b].A += sa;
-
-      if (sa > sb) {
-        table[a].W++; table[b].L++; table[a].Pts += 3;
-      } else if (sb > sa) {
-        table[b].W++; table[a].L++; table[b].Pts += 3;
-      } else {
-        table[a].D++; table[b].D++; table[a].Pts++; table[b].Pts++;
-      }
-    });
-
-    Object.entries(table).forEach(([team, s]) => {
-      const row = document.createElement("div");
-      row.className = "grid-row";
-
-      row.innerHTML = `
-        <div>${team}</div>
-        <div>${s.P}</div>
-        <div>${s.W}</div>
-        <div>${s.D}</div>
-        <div>${s.L}</div>
-        <div>${s.F}</div>
-        <div>${s.A}</div>
-        <div>${s.Pts}</div>
-      `;
-
-      grid.appendChild(row);
-    });
-
-    wrapper.appendChild(title);
-    wrapper.appendChild(grid);
-    container.appendChild(wrapper);
-  });
-}
-
-/* ---------------- SINGLE ENTRY POINT ---------------- */
-async function manualRefresh() {
-  if (!isActiveInstance()) return;
-  if (isRefreshing) return;
-
-  isRefreshing = true;
-
-  try {
-    const data = await fetchData();
-
-    renderResults(data);
-    renderGroups(data);
-
-    const banner = document.getElementById("updateBanner");
-    banner.style.display = "block";
-
-    setTimeout(() => {
-      banner.style.display = "none";
-    }, 1200);
-
-  } finally {
-    isRefreshing = false;
-  }
-}
-
-/* ---------------- INIT ---------------- */
-manualRefresh();
-
+load();
 </script>
 
 </body>
