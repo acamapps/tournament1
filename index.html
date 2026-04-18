@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Production Tournament Dashboard</title>
+  <title>Tournament Dashboard (Hard-Locked)</title>
 
   <style>
     body {
@@ -28,9 +28,7 @@
       font-size: 14px;
     }
 
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
     .grid {
       display: grid;
@@ -101,9 +99,7 @@
   🔄 Refresh Dashboard
 </button>
 
-<div id="updateBanner">
-  🟢 Updated from Google Sheets
-</div>
+<div id="updateBanner">🟢 Updated from Google Sheets</div>
 
 <div id="results" class="section results">
   <h2>Live Results</h2>
@@ -113,16 +109,28 @@
 
 <script>
 
+/* ---------------- CONFIG ---------------- */
 const BASE_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
+
+/* ---------------- HARD LOCK: SINGLE INSTANCE ---------------- */
+const INSTANCE_ID = Math.random().toString(36).substring(2);
+localStorage.setItem("dashboardInstance", INSTANCE_ID);
+
+function isActiveInstance() {
+  return localStorage.getItem("dashboardInstance") === INSTANCE_ID;
+}
 
 /* ---------------- STATE ---------------- */
 let isRefreshing = false;
 
-/* ---------------- FETCH SNAPSHOT ---------------- */
+/* ---------------- FETCH (CACHE SAFE) ---------------- */
 async function fetchData() {
   const res = await fetch(BASE_URL + "&_=" + Date.now(), {
-    cache: "no-store"
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache"
+    }
   });
 
   const text = await res.text();
@@ -144,14 +152,21 @@ async function fetchData() {
     });
 }
 
-/* ---------------- FULL SNAPSHOT RENDER (RESULTS) ---------------- */
+/* ---------------- SAFE BOOLEAN ---------------- */
+function isPlayed(row) {
+  return String(row.Played || "")
+    .trim()
+    .toUpperCase() === "TRUE";
+}
+
+/* ---------------- FULL SNAPSHOT: RESULTS ---------------- */
 function renderResults(matches) {
   const container = document.getElementById("results");
 
   container.innerHTML = "<h2>Live Results</h2>";
 
   matches
-    .filter(m => String(m.Played || "").toUpperCase() === "TRUE")
+    .filter(isPlayed)
     .forEach(m => {
       const div = document.createElement("div");
       div.className = "result-item";
@@ -160,7 +175,7 @@ function renderResults(matches) {
     });
 }
 
-/* ---------------- FULL SNAPSHOT RENDER (GROUPS) ---------------- */
+/* ---------------- FULL SNAPSHOT: GROUPS ---------------- */
 function renderGroups(matches) {
   const container = document.getElementById("groups");
   container.innerHTML = "";
@@ -194,7 +209,7 @@ function renderGroups(matches) {
     const table = {};
 
     list.forEach(m => {
-      if (String(m.Played || "").toUpperCase() !== "TRUE") return;
+      if (!isPlayed(m)) return;
 
       const a = m.TeamA;
       const b = m.TeamB;
@@ -243,7 +258,9 @@ function renderGroups(matches) {
 
 /* ---------------- SINGLE ENTRY POINT ---------------- */
 async function manualRefresh() {
+  if (!isActiveInstance()) return;
   if (isRefreshing) return;
+
   isRefreshing = true;
 
   try {
@@ -257,7 +274,7 @@ async function manualRefresh() {
 
     setTimeout(() => {
       banner.style.display = "none";
-    }, 1500);
+    }, 1200);
 
   } finally {
     isRefreshing = false;
