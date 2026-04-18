@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tournament Dashboard (Trigger-Based)</title>
+  <title>Tournament Dashboard (Clean Triggered Version)</title>
 
   <style>
     body {
@@ -84,7 +84,7 @@
 <h1>🏆 Tournament Dashboard</h1>
 
 <div id="updateBanner">
-  🟡 New update received from Google Sheets
+  🟡 Update received from Google Sheets
 </div>
 
 <div id="results" class="section results">
@@ -100,6 +100,9 @@ const BASE_URL =
 
 /* ---------------- STATE ---------------- */
 let lastTrigger = "";
+let isRefreshing = false;
+
+/* ---------------- KEYED STORAGE ---------------- */
 let resultMap = {};
 let groupMap = {};
 
@@ -128,14 +131,17 @@ async function fetchData() {
     });
 }
 
-/* ---------------- INIT RESULTS ---------------- */
-function initResults(matches) {
+/* ---------------- RESULTS (NO DIFF LOGIC) ---------------- */
+function renderResults(matches) {
   const container = document.getElementById("results");
 
   if (!container.dataset.init) {
     container.innerHTML = "<h2>Live Results</h2>";
     container.dataset.init = "true";
   }
+
+  // overwrite state completely (no comparisons, no diffing)
+  resultMap = {};
 
   matches.forEach(m => {
     const id = m.MatchID;
@@ -149,34 +155,29 @@ function initResults(matches) {
         el: div,
         data: m
       };
-    } else {
-      resultMap[id].data = m;
     }
-  });
-}
 
-/* ---------------- UPDATE RESULTS ---------------- */
-function updateResults() {
-  Object.values(resultMap).forEach(r => {
-    const m = r.data;
+    const isPlayed = String(m.Played || "").toUpperCase() === "TRUE";
 
-    const played = String(m.Played || "").toUpperCase() === "TRUE";
+    const el = resultMap[id].el;
 
-    if (!played) {
-      r.el.classList.add("hidden");
+    if (!isPlayed) {
+      el.classList.add("hidden");
+      el.textContent = "";
       return;
     }
 
-    r.el.classList.remove("hidden");
-
-    r.el.textContent =
-      `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
+    el.classList.remove("hidden");
+    el.textContent = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
   });
 }
 
-/* ---------------- GROUPS ---------------- */
-function updateGroups(matches) {
+/* ---------------- GROUPS (FULL REWRITE ON REFRESH ONLY) ---------------- */
+function renderGroups(matches) {
   const container = document.getElementById("groups");
+
+  container.innerHTML = ""; // full reset on refresh only
+  groupMap = {};
 
   const groups = {};
 
@@ -189,30 +190,20 @@ function updateGroups(matches) {
   Object.keys(groups).forEach(g => {
     const list = groups[g];
 
-    if (!groupMap[g]) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "group";
+    const wrapper = document.createElement("div");
+    wrapper.className = "group";
 
-      const title = document.createElement("h2");
-      title.textContent = "Group " + g;
+    const title = document.createElement("h2");
+    title.textContent = "Group " + g;
 
-      const grid = document.createElement("div");
+    const grid = document.createElement("div");
 
-      grid.innerHTML = `
-        <div class="grid-header">
-          <div>Team</div><div>P</div><div>W</div><div>D</div>
-          <div>L</div><div>F</div><div>A</div><div>Pts</div>
-        </div>
-      `;
-
-      wrapper.appendChild(title);
-      wrapper.appendChild(grid);
-      container.appendChild(wrapper);
-
-      groupMap[g] = { grid, rows: {} };
-    }
-
-    const gNode = groupMap[g];
+    grid.innerHTML = `
+      <div class="grid-header">
+        <div>Team</div><div>P</div><div>W</div><div>D</div>
+        <div>L</div><div>F</div><div>A</div><div>Pts</div>
+      </div>
+    `;
 
     const table = {};
 
@@ -243,62 +234,58 @@ function updateGroups(matches) {
     const ladder = Object.entries(table).map(([team, s]) => ({ team, ...s }));
 
     ladder.forEach(t => {
-      const key = g + ":" + t.team;
+      const row = document.createElement("div");
+      row.className = "grid-row";
 
-      if (!gNode.rows[key]) {
-        const row = document.createElement("div");
-        row.className = "grid-row";
+      row.innerHTML = `
+        <div>${t.team}</div>
+        <div>${t.P}</div>
+        <div>${t.W}</div>
+        <div>${t.D}</div>
+        <div>${t.L}</div>
+        <div>${t.F}</div>
+        <div>${t.A}</div>
+        <div>${t.Pts}</div>
+      `;
 
-        row.innerHTML =
-          `<div></div><div></div><div></div><div></div>` +
-          `<div></div><div></div><div></div><div></div>`;
-
-        gNode.grid.appendChild(row);
-        gNode.rows[key] = row;
-      }
-
-      const r = gNode.rows[key].children;
-
-      r[0].textContent = t.team;
-      r[1].textContent = t.P;
-      r[2].textContent = t.W;
-      r[3].textContent = t.D;
-      r[4].textContent = t.L;
-      r[5].textContent = t.F;
-      r[6].textContent = t.A;
-      r[7].textContent = t.Pts;
+      grid.appendChild(row);
     });
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(grid);
+    container.appendChild(wrapper);
   });
 }
 
 /* ---------------- MANUAL REFRESH (ONLY ENTRY POINT) ---------------- */
 async function manualRefresh() {
-  const data = await fetchData();
+  if (isRefreshing) return;
+  isRefreshing = true;
 
-  initResults(data);
-  updateResults();
-  updateGroups(data);
+  try {
+    const data = await fetchData();
 
-  document.getElementById("updateBanner").style.display = "none";
+    renderResults(data);
+    renderGroups(data);
+
+    document.getElementById("updateBanner").style.display = "none";
+  } finally {
+    isRefreshing = false;
+  }
 }
 
-/* ---------------- TRIGGER CHECK (ONLY CELL Z1) ---------------- */
+/* ---------------- TRIGGER CHECK (Z1 ONLY, NO DATA COMPARISON) ---------------- */
 async function checkTrigger() {
   const res = await fetch(BASE_URL + "&range=Z1");
-  const text = await res.text();
+  const text = (await res.text()).trim();
 
-  const triggerValue = text.trim();
+  if (!text || text === lastTrigger) return;
 
-  if (!triggerValue) return;
+  lastTrigger = text;
 
-  // ONLY react to real increments
-  if (triggerValue !== lastTrigger) {
-    lastTrigger = triggerValue;
+  document.getElementById("updateBanner").style.display = "block";
 
-    document.getElementById("updateBanner").style.display = "block";
-
-    manualRefresh();
-  }
+  manualRefresh();
 }
 
 /* ---------------- START ---------------- */
