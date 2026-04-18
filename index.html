@@ -289,8 +289,12 @@ async function manualRefresh() {
 }
 
 /* ---------------- TRIGGER CHECK (Z1 ONLY, NO DATA COMPARISON) ---------------- */
+const TRIGGER_URL = "YOUR_WEB_APP_URL_HERE";
+
+let lastTrigger = "";
+
 async function checkTrigger() {
-  const res = await fetch(BASE_URL + "&range=Z1");
+  const res = await fetch(TRIGGER_URL + "?t=" + Date.now());
   const text = (await res.text()).trim();
 
   if (!text || text === lastTrigger) return;
@@ -304,7 +308,6 @@ async function checkTrigger() {
 
 /* ---------------- START ---------------- */
 manualRefresh();
-setInterval(checkTrigger, 3000);
 
 </script>
 
