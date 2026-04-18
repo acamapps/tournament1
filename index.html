@@ -90,7 +90,7 @@ function renderGrid(data) {
 async function loadDashboard() {
   try {
     const matches = await fetchRange("MATCHES_PLAYED", "A1:F13");
-    const tables = await fetchRange("TABLES_SORTED", "A1:I15");
+    const tables = await fetchRange("TABLES_SORTED", "A1:I13");
     const semis = await fetchRange("SEMIS", "A1:E5");
     const finals = await fetchRange("FINALS", "A1:E5");
     const results = await fetchRange("RESULTS_DATA", "A1:A8");
