@@ -1,27 +1,55 @@
-async function load() {
-  const matches = await fetchData("MATCHES_PLAYED");
-  const tables = await fetchData("TABLES_SORTED");
-  const semis = await fetchData("SEMIS");
-  const finals = await fetchData("FINALS");
+<script>
+const API_URL = "YOUR_DEPLOYED_URL";
 
-  document.getElementById("matches").innerHTML =
-    matches.length
-      ? matches.map(m => `<div>${Object.values(m).join(" | ")}</div>`).join("")
-      : "No completed matches";
-
-  document.getElementById("tables").innerHTML =
-    tables.length
-      ? tables.map(t => `<div>${Object.values(t).join(" | ")}</div>`).join("")
-      : "No table data";
-
-  document.getElementById("semis").innerHTML =
-    semis.length
-      ? semis.map(s => `<div>${Object.values(s).join(" | ")}</div>`).join("")
-      : "TBD";
-
-  document.getElementById("finals").innerHTML =
-    finals.length
-      ? finals.map(f => `<div>${Object.values(f).join(" | ")}</div>`).join("")
-      : "TBD";
+async function fetchSheet(sheet) {
+  const res = await fetch(`${API_URL}?sheet=${sheet}`);
+  return await res.json();
 }
-load();
+
+function renderMatches(data) {
+  return data.map(m => `
+    <div style="padding:6px;border-bottom:1px solid #333">
+      <b>${m.TeamA}</b> ${m.ScoreA} - ${m.ScoreB} <b>${m.TeamB}</b>
+      <span style="float:right;color:#aaa">${m.WINNER ? "Winner: " + m.WINNER : "TBD"}</span>
+    </div>
+  `).join("");
+}
+
+function renderTables(data) {
+  return data.map(t => `
+    <div style="padding:4px">
+      ${Object.values(t).slice(0,3).join(" | ")}
+    </div>
+  `).join("");
+}
+
+async function loadDashboard() {
+  try {
+    const matches = await fetchSheet("MATCHES_PLAYED");
+    const tables = await fetchSheet("TABLES_SORTED");
+    const semis = await fetchSheet("SEMIS");
+    const finals = await fetchSheet("FINALS");
+
+    document.getElementById("matches").innerHTML =
+      renderMatches(matches);
+
+    document.getElementById("tables").innerHTML =
+      renderTables(tables);
+
+    document.getElementById("semis").innerHTML =
+      semis.length
+        ? semis.map(s => `<div>${JSON.stringify(s)}</div>`).join("")
+        : "TBD";
+
+    document.getElementById("finals").innerHTML =
+      finals.length
+        ? finals.map(f => `<div>${JSON.stringify(f)}</div>`).join("")
+        : "TBD";
+
+  } catch (err) {
+    console.error("Dashboard load error:", err);
+  }
+}
+
+loadDashboard();
+</script>
