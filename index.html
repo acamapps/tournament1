@@ -53,7 +53,6 @@
       .grid { grid-template-columns: 1fr 1fr; }
     }
 
-    /* 🔔 soft update indicator */
     #updateBanner {
       display: none;
       margin-bottom: 10px;
@@ -65,12 +64,13 @@
     }
 
     button {
-      padding: 8px 12px;
+      padding: 6px 10px;
       border: none;
-      border-radius: 6px;
+      border-radius: 5px;
       cursor: pointer;
       background: #007bff;
       color: white;
+      margin-left: 10px;
     }
   </style>
 </head>
@@ -80,8 +80,8 @@
 <h1>🏆 Tournament Dashboard</h1>
 
 <div id="updateBanner">
-  🟡 New updates available — click refresh
-  <button onclick="manualRefresh()">Refresh Now</button>
+  🟡 New updates available
+  <button onclick="manualRefresh()">Refresh</button>
 </div>
 
 <div id="results" class="section results">
@@ -95,8 +95,12 @@
 const BASE_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
+/* ---------------- STATE ---------------- */
 let lastHash = "";
 let pendingUpdate = false;
+
+let resultNodes = [];
+let groupCache = {};
 
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
@@ -182,13 +186,7 @@ function sortLadder(ladder) {
   );
 }
 
-/* ---------------- RENDER ---------------- */
-function renderAll(data) {
-  renderResults(data);
-  renderGroups(data);
-}
-
-/* ---------------- RESULTS ---------------- */
+/* ---------------- RESULTS (NO REBUILD) ---------------- */
 function renderResults(matches) {
   const container = document.getElementById("results");
 
@@ -196,65 +194,88 @@ function renderResults(matches) {
     .filter(m => String(m.Played || "").trim().toUpperCase() === "TRUE")
     .reverse();
 
-  container.innerHTML = "<h2>Live Results</h2>";
+  if (!container.dataset.init) {
+    container.innerHTML = "<h2>Live Results</h2>";
+    container.dataset.init = "true";
+  }
 
-  completed.forEach(m => {
+  while (resultNodes.length < completed.length) {
     const div = document.createElement("div");
     div.className = "result-item";
-    div.textContent = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
     container.appendChild(div);
+    resultNodes.push(div);
+  }
+
+  completed.forEach((m, i) => {
+    const text = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
+    if (resultNodes[i].textContent !== text) {
+      resultNodes[i].textContent = text;
+    }
   });
+
+  while (resultNodes.length > completed.length) {
+    resultNodes.pop().remove();
+  }
 }
 
-/* ---------------- GROUPS ---------------- */
+/* ---------------- GROUPS (NO REBUILD) ---------------- */
 function renderGroups(matches) {
   const container = document.getElementById("groups");
-  container.innerHTML = "";
 
   const groups = groupMatches(matches);
 
   Object.keys(groups).sort().forEach(g => {
     const ladder = sortLadder(buildLadder(groups[g]));
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "group";
+    if (!groupCache[g]) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "group";
 
-    const title = document.createElement("h2");
-    title.textContent = "Group " + g;
+      const title = document.createElement("h2");
+      title.textContent = "Group " + g;
 
-    const table = document.createElement("table");
-
-    table.innerHTML = `
-      <tr>
-        <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-        <th>F</th><th>A</th><th>Pts</th>
-      </tr>
-    `;
-
-    ladder.forEach(t => {
-      const row = document.createElement("tr");
-
-      row.innerHTML = `
-        <td>${t.team}</td>
-        <td>${t.P}</td>
-        <td>${t.W}</td>
-        <td>${t.D}</td>
-        <td>${t.L}</td>
-        <td>${t.F}</td>
-        <td>${t.A}</td>
-        <td>${t.Pts}</td>
+      const table = document.createElement("table");
+      table.innerHTML = `
+        <tr>
+          <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
+          <th>F</th><th>A</th><th>Pts</th>
+        </tr>
       `;
 
-      table.appendChild(row);
-    });
+      wrapper.appendChild(title);
+      wrapper.appendChild(table);
+      container.appendChild(wrapper);
 
-    wrapper.appendChild(title);
-    wrapper.appendChild(table);
-    container.appendChild(wrapper);
+      groupCache[g] = { table, rows: {} };
+    }
+
+    const cache = groupCache[g];
+
+    ladder.forEach(t => {
+      let row = cache.rows[t.team];
+
+      if (!row) {
+        row = document.createElement("tr");
+        row.innerHTML = `<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        cache.table.appendChild(row);
+        cache.rows[t.team] = row;
+      }
+
+      const c = row.children;
+
+      c[0].textContent = t.team;
+      c[1].textContent = t.P;
+      c[2].textContent = t.W;
+      c[3].textContent = t.D;
+      c[4].textContent = t.L;
+      c[5].textContent = t.F;
+      c[6].textContent = t.A;
+      c[7].textContent = t.Pts;
+    });
   });
 }
 
-/* ---------------- CONTROLLED UPDATE LOOP ---------------- */
+/* ---------------- CONTROL LOOP ---------------- */
 async function checkForUpdates() {
   const data = await fetchData();
   const hash = createHash(data);
@@ -263,12 +284,10 @@ async function checkForUpdates() {
     lastHash = hash;
     pendingUpdate = true;
 
-    // show soft indicator instead of forcing redraw
     document.getElementById("updateBanner").style.display = "block";
   }
 }
 
-/* ---------------- MANUAL REFRESH ---------------- */
 async function manualRefresh() {
   const data = await fetchData();
 
@@ -277,12 +296,13 @@ async function manualRefresh() {
 
   document.getElementById("updateBanner").style.display = "none";
 
-  renderAll(data);
+  renderResults(data);
+  renderGroups(data);
 }
 
 /* ---------------- INIT ---------------- */
-manualRefresh();          // initial load
-setInterval(checkForUpdates, 15000); // silent check every 15s
+manualRefresh();
+setInterval(checkForUpdates, 15000);
 
 </script>
 
