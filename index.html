@@ -15,7 +15,7 @@
 
     .section { margin-bottom: 30px; }
 
-    .results {
+    .results, .group {
       background: white;
       padding: 15px;
       border-radius: 10px;
@@ -26,14 +26,6 @@
       padding: 6px 0;
       border-bottom: 1px solid #eee;
       font-size: 14px;
-    }
-
-    .group {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 20px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
     table {
@@ -67,7 +59,6 @@
 
 <h1>🏆 Tournament Dashboard</h1>
 
-<!-- ✅ Header moved OUT of JS (important fix) -->
 <div id="results" class="section results">
   <h2>Live Results</h2>
 </div>
@@ -78,9 +69,13 @@
 
 const BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSAQdMH5d5-6lGZzC9BD0RRnFu9wrnZSWMD93pKCV7X_yrbcKCDsnxKX1gzSgf6fxvSxTWPZNKwkDBl/pub?gid=892945414&single=true&output=csv";
 
-let groupCache = {};
-let resultsCache = [];
-let lastDataString = "";
+/* ---------------- STATE ---------------- */
+let state = {
+  matches: []
+};
+
+let lastHash = "";
+let renderQueued = false;
 
 /* ---------------- FETCH ---------------- */
 async function fetchData() {
@@ -163,7 +158,7 @@ function sortLadder(ladder) {
   );
 }
 
-/* ---------------- RESULTS (FIXED - NO WIPE) ---------------- */
+/* ---------------- RENDER RESULTS ---------------- */
 function renderResults(matches) {
   const container = document.getElementById("results");
 
@@ -171,118 +166,102 @@ function renderResults(matches) {
     .filter(m => (m.Played || "").trim().toUpperCase() === "TRUE")
     .reverse();
 
-  // ✅ ONLY create missing elements (no innerHTML wipe)
-  if (resultsCache.length < completed.length) {
-    for (let i = resultsCache.length; i < completed.length; i++) {
-      const div = document.createElement("div");
-      div.className = "result-item";
-      container.appendChild(div);
-      resultsCache.push(div);
-    }
-  }
-
-  // update text only
-  completed.forEach((m, i) => {
-    if (!resultsCache[i]) return;
-
-    const text = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
-
-    if (resultsCache[i].textContent !== text) {
-      resultsCache[i].textContent = text;
-    }
-  });
-}
-
-/* ---------------- CREATE GROUP ---------------- */
-function createGroup(name) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "group";
+  const fragment = document.createDocumentFragment();
 
   const title = document.createElement("h2");
-  title.textContent = "Group " + name;
+  title.textContent = "Live Results";
+  fragment.appendChild(title);
 
-  const table = document.createElement("table");
-
-  table.innerHTML = `
-    <tr>
-      <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-      <th>F</th><th>A</th><th>Pts</th>
-    </tr>
-  `;
-
-  wrapper.appendChild(title);
-  wrapper.appendChild(table);
-
-  return { wrapper, table, rows: {} };
-}
-
-/* ---------------- UPDATE GROUP (FIXED ORDERING) ---------------- */
-function updateGroup(cache, ladder) {
-  const table = cache.table;
-
-  // ensure correct DOM order
-  ladder.forEach(t => {
-    if (cache.rows[t.team]) {
-      table.appendChild(cache.rows[t.team]);
-    }
+  completed.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "result-item";
+    div.textContent = `${m.TeamA} ${m.ScoreA} - ${m.ScoreB} ${m.TeamB}`;
+    fragment.appendChild(div);
   });
 
-  ladder.forEach(t => {
-    let row = cache.rows[t.team];
-
-    if (!row) {
-      row = document.createElement("tr");
-      row.innerHTML = `<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-      cache.table.appendChild(row);
-      cache.rows[t.team] = row;
-    }
-
-    const c = row.children;
-
-    c[0].textContent = t.team;
-    c[1].textContent = t.P;
-    c[2].textContent = t.W;
-    c[3].textContent = t.D;
-    c[4].textContent = t.L;
-    c[5].textContent = t.F;
-    c[6].textContent = t.A;
-    c[7].textContent = t.Pts;
-  });
+  container.replaceChildren(fragment);
 }
 
-/* ---------------- INIT ---------------- */
-let lastDataString = "";
-
-async function init() {
-  const data = await fetchData();
-
-  const dataString = data.map(r => [
-    (r.Group || "").trim(),
-    (r.TeamA || "").trim(),
-    (r.TeamB || "").trim(),
-    parseInt(r.ScoreA) || 0,
-    parseInt(r.ScoreB) || 0,
-    (r.Played || "").toUpperCase().trim()
-  ].join("|")).join("~");
-
-  if (dataString === lastDataString) return;
-  lastDataString = dataString;
-
-  renderResults(data);
-
-  const groups = groupMatches(data);
+/* ---------------- RENDER GROUPS ---------------- */
+function renderGroups(matches) {
   const container = document.getElementById("groups");
+
+  const groups = groupMatches(matches);
+  const fragment = document.createDocumentFragment();
 
   Object.keys(groups).sort().forEach(g => {
     const ladder = sortLadder(buildLadder(groups[g]));
 
-    if (!groupCache[g]) {
-      groupCache[g] = createGroup(g);
-      container.appendChild(groupCache[g].wrapper);
-    }
+    const wrapper = document.createElement("div");
+    wrapper.className = "group";
 
-    updateGroup(groupCache[g], ladder);
+    const title = document.createElement("h2");
+    title.textContent = "Group " + g;
+    wrapper.appendChild(title);
+
+    const table = document.createElement("table");
+
+    table.innerHTML = `
+      <tr>
+        <th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
+        <th>F</th><th>A</th><th>Pts</th>
+      </tr>
+    `;
+
+    ladder.forEach(t => {
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${t.team}</td>
+        <td>${t.P}</td>
+        <td>${t.W}</td>
+        <td>${t.D}</td>
+        <td>${t.L}</td>
+        <td>${t.F}</td>
+        <td>${t.A}</td>
+        <td>${t.Pts}</td>
+      `;
+
+      table.appendChild(row);
+    });
+
+    wrapper.appendChild(table);
+    fragment.appendChild(wrapper);
   });
+
+  container.replaceChildren(fragment);
+}
+
+/* ---------------- RENDER (SINGLE SOURCE OF TRUTH) ---------------- */
+function render() {
+  renderResults(state.matches);
+  renderGroups(state.matches);
+}
+
+/* ---------------- SCHEDULED RENDER ---------------- */
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    render();
+  });
+}
+
+/* ---------------- INIT LOOP ---------------- */
+async function init() {
+  const data = await fetchData();
+
+  const hash = data.map(r =>
+    `${r.Group}|${r.TeamA}|${r.TeamB}|${r.ScoreA}|${r.ScoreB}|${r.Played}`
+  ).join("~");
+
+  if (hash === lastHash) return;
+  lastHash = hash;
+
+  state.matches = data;
+  scheduleRender();
 }
 
 init();
