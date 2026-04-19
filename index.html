@@ -2,23 +2,38 @@
 <html>
 <head>
   <title>Tournament Dashboard</title>
+
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #111;
-      color: #fff;
+      color: #e0e0e0;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 20px;
+      font-weight: 600;
+      letter-spacing: 1px;
     }
 
     .card {
-      background: #222;
-      padding: 15px;
-      margin: 15px;
-      border-radius: 10px;
+      background: #1b1b1b;
+      padding: 18px;
+      margin: 15px auto;
+      border-radius: 14px;
+      max-width: 900px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
     }
 
     h2 {
-      border-bottom: 1px solid #444;
-      padding-bottom: 5px;
+      margin: 0 0 10px 0;
+      padding-bottom: 6px;
+      font-size: 18px;
+      font-weight: 600;
+      border-bottom: 2px solid #444;
+      letter-spacing: 0.5px;
     }
 
     table {
@@ -28,13 +43,36 @@
     }
 
     td {
-      border: 1px solid #333;
-      padding: 6px;
-      text-align: center;
+      padding: 8px 6px;
+      border-bottom: 1px solid #2a2a2a;
+      line-height: 1.4;
+    }
+
+    tr:first-child td {
+      font-weight: bold;
+      color: #bbb;
+      border-bottom: 2px solid #444;
+    }
+
+    tr:hover td {
+      background: #2a2a2a;
+    }
+
+    /* Emphasis for key sections */
+    #final table td {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    #semis table td {
+      font-weight: 500;
     }
   </style>
 </head>
+
 <body>
+
+<h1>Tournament Dashboard</h1>
 
 <div class="card">
   <h2>Matches</h2>
@@ -80,15 +118,29 @@ async function fetchRange(sheet, range) {
   return await res.json();
 }
 
-// Render grid exactly like sheet
+// Render grid with formatting improvements
 function renderGrid(data) {
+
+  // 🔥 Remove completely empty rows
+  data = data.filter(row => row.some(cell => cell !== ""));
+
   let html = "<table>";
 
-  data.forEach(row => {
+  data.forEach((row, i) => {
     html += "<tr>";
+
     row.forEach(cell => {
-      html += `<td>${cell ?? ""}</td>`;
+
+      // Align numbers center, text left
+      const align = typeof cell === "number" ? "center" : "left";
+
+      html += `
+        <td style="text-align:${align}">
+          ${cell ?? ""}
+        </td>
+      `;
     });
+
     html += "</tr>";
   });
 
@@ -123,7 +175,7 @@ async function loadDashboard() {
 // Initial load
 loadDashboard();
 
-// Optional: auto-refresh every 10 seconds
+// Auto-refresh every 10 seconds
 setInterval(loadDashboard, 10000);
 </script>
 
