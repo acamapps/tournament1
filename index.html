@@ -99,7 +99,7 @@ function renderGrid(data) {
 // Load all sections
 async function loadDashboard() {
   try {
-    const matches = await fetchRange("MATCHES_PLAYED", "A1:F13");
+    const matches = await fetchRange("MATCHES_PLAYED", "A1:H13");
     const groupA = await fetchRange("TABLES", "A2:I6");
     const groupB = await fetchRange("TABLES", "L2:T6");
     const semis = await fetchRange("SEMIS", "A1:E5");
