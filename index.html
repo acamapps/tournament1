@@ -153,7 +153,7 @@ async function loadDashboard() {
   try {
     const matches = await fetchRange("MATCHES_PLAYED", "A1:I13");
     const groupA = await fetchRange("TABLES", "A2:I6");
-    const groupB = await fetchRange("TABLES", "L2:T6");
+    const groupB = await fetchRange("TABLES", "K2:S6");
     const semis = await fetchRange("SEMIS", "A1:E5");
     const tppo = await fetchRange("TPPO", "A2:E2");
     const final = await fetchRange("FINAL", "A2:E2");
