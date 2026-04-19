@@ -42,8 +42,13 @@
 </div>
 
 <div class="card">
-  <h2>Tables</h2>
-  <div id="tables"></div>
+  <h2>Group A</h2>
+  <div id="groupA"></div>
+</div>
+
+<div class="card">
+  <h2>Group B</h2>
+  <div id="groupB"></div>
 </div>
 
 <div class="card">
@@ -52,8 +57,13 @@
 </div>
 
 <div class="card">
+  <h2>3rd Place Playoff</h2>
+  <div id="tppo"></div>
+</div>
+
+<div class="card">
   <h2>Final</h2>
-  <div id="finals"></div>
+  <div id="final"></div>
 </div>
 
 <div class="card">
@@ -90,15 +100,19 @@ function renderGrid(data) {
 async function loadDashboard() {
   try {
     const matches = await fetchRange("MATCHES_PLAYED", "A1:F13");
-    const tables = await fetchRange("TABLES_SORTED", "A1:I13");
+    const groupA = await fetchRange("TABLES", "A2:I6");
+    const groupB = await fetchRange("TABLES", "L2:T6");
     const semis = await fetchRange("SEMIS", "A1:E5");
-    const finals = await fetchRange("FINALS", "A1:E5");
+    const tppo = await fetchRange("TPPO", "A2:E2");
+    const final = await fetchRange("FINAL", "A2:E2");
     const results = await fetchRange("RESULTS_DATA", "A1:A8");
 
     document.getElementById("matches").innerHTML = renderGrid(matches);
-    document.getElementById("tables").innerHTML = renderGrid(tables);
+    document.getElementById("groupA").innerHTML = renderGrid(groupA);
+    document.getElementById("groupB").innerHTML = renderGrid(groupB);
     document.getElementById("semis").innerHTML = renderGrid(semis);
-    document.getElementById("finals").innerHTML = renderGrid(finals);
+    document.getElementById("tppo").innerHTML = renderGrid(tppo);
+    document.getElementById("final").innerHTML = renderGrid(final);
     document.getElementById("results").innerHTML = renderGrid(results);
 
   } catch (err) {
