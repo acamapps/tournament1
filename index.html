@@ -46,7 +46,6 @@
       padding: 8px 6px;
       border-bottom: 1px solid #2a2a2a;
       line-height: 1.4;
-      text-align: center;
     }
 
     tr:first-child td {
@@ -59,6 +58,7 @@
       background: #2a2a2a;
     }
 
+    /* Emphasis for key sections */
     #final table td {
       font-size: 18px;
       font-weight: bold;
@@ -68,14 +68,13 @@
       font-weight: 500;
     }
     
-    #matchesCard h2 { color: #4fc3f7; }
-    #groupACard h2 { color: #81c784; }
+    #matchesCard h2 { color: #4fc3f7; }   /* blue */
+    #groupACard h2 { color: #81c784; }    /* green */
     #groupBCard h2 { color: #81c784; }
-    #semisCard h2 { color: #eb00be; }
-    #tppoCard h2 { color: #961a1a; }
-    #finalCard h2 { color: #ffd54f; text-shadow: 0 0 6px rgba(255,213,79,0.4); }
-    #resultsCard h2 { color: #e57373; }
-
+    #semisCard h2 { color: #eb00be; }     /* pink */
+    #tppoCard h2 { color: #961a1a; }     /* brown */
+    #finalCard h2 { color: #ffd54f; text-shadow: 0 0 6px rgba(255,213,79,0.4);}     /* gold */
+    #resultsCard h2 { color: #e57373; }   /* red */
     #resultsCard td {
       font-size: 18px;
       font-weight: 600;
@@ -131,30 +130,10 @@ async function fetchRange(sheet, range) {
   return await res.json();
 }
 
-// Standard grid renderer
+// Render grid with formatting improvements
 function renderGrid(data) {
 
-  data = data.filter(row => row.some(cell => cell !== ""));
-
-  let html = "<table>";
-
-  data.forEach((row) => {
-    html += "<tr>";
-
-    row.forEach(cell => {
-      html += `<td>${cell ?? ""}</td>`;
-    });
-
-    html += "</tr>";
-  });
-
-  html += "</table>";
-  return html;
-}
-
-// 🆕 RESULTS RENDERER (NEW STEP 1 IMPLEMENTATION)
-function renderResults(data) {
-
+  // Remove empty rows
   data = data.filter(row => row.some(cell => cell !== ""));
 
   let html = "<table>";
@@ -163,27 +142,11 @@ function renderResults(data) {
     html += "<tr>";
 
     row.forEach(cell => {
-
-      let style = "text-align:center;";
-
-      // Rows 1,3,5,7 → heading style
-      if (i % 2 === 0) {
-        style += `
-          font-weight:bold;
-          color:#bbb;
-          border-bottom:2px solid #444;
-        `;
-      }
-
-      // Rows 2,4,6,8 → emphasis style
-      if (i % 2 === 1) {
-        style += `
-          font-weight:800;
-          font-size:18px;
-        `;
-      }
-
-      html += `<td style="${style}">${cell ?? ""}</td>`;
+      html += `
+        <td style="text-align:center">
+          ${cell ?? ""}
+        </td>
+      `;
     });
 
     html += "</tr>";
@@ -199,9 +162,9 @@ async function loadDashboard() {
     const matches = await fetchRange("MATCHES_PLAYED", "A1:I13");
     const groupA = await fetchRange("TABLES", "A2:I6");
     const groupB = await fetchRange("TABLES", "K2:S6");
-    const semis = await fetchRange("SEMIS", "A1:E5");
-    const tppo = await fetchRange("TPPO", "A2:E2");
-    const final = await fetchRange("FINAL", "A2:E2");
+    const semis = await fetchRange("SEMIS", "A1:H5");
+    const tppo = await fetchRange("TPPO", "A2:H2");
+    const final = await fetchRange("FINAL", "A2:H2");
     const results = await fetchRange("RESULTS", "A1:A8");
 
     document.getElementById("matches").innerHTML = renderGrid(matches);
@@ -210,9 +173,7 @@ async function loadDashboard() {
     document.getElementById("semis").innerHTML = renderGrid(semis);
     document.getElementById("tppo").innerHTML = renderGrid(tppo);
     document.getElementById("final").innerHTML = renderGrid(final);
-
-    // UPDATED
-    document.getElementById("results").innerHTML = renderResults(results);
+    document.getElementById("results").innerHTML = renderGrid(results);
 
   } catch (err) {
     console.error("Dashboard error:", err);
