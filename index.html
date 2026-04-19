@@ -128,7 +128,7 @@ async function fetchRange(sheet, range) {
 // Render grid with formatting improvements
 function renderGrid(data) {
 
-  // 🔥 Remove completely empty rows
+  // Remove empty rows
   data = data.filter(row => row.some(cell => cell !== ""));
 
   let html = "<table>";
@@ -137,10 +137,6 @@ function renderGrid(data) {
     html += "<tr>";
 
     row.forEach(cell => {
-
-      // Align numbers center, text left
-      <td style="text-align:center">
-
       html += `
         <td style="text-align:center">
           ${cell ?? ""}
