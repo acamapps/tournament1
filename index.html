@@ -132,10 +132,10 @@ function renderGrid(data) {
     row.forEach(cell => {
 
       // Align numbers center, text left
-      const align = typeof cell === "number" ? "center" : "left";
+      <td style="text-align:center">
 
       html += `
-        <td style="text-align:${align}">
+        <td style="text-align:center">
           ${cell ?? ""}
         </td>
       `;
