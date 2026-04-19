@@ -46,6 +46,7 @@
       padding: 8px 6px;
       border-bottom: 1px solid #2a2a2a;
       line-height: 1.4;
+      text-align: center;
     }
 
     tr:first-child td {
@@ -58,7 +59,6 @@
       background: #2a2a2a;
     }
 
-    /* Emphasis for key sections */
     #final table td {
       font-size: 18px;
       font-weight: bold;
@@ -73,8 +73,9 @@
     #groupBCard h2 { color: #81c784; }
     #semisCard h2 { color: #eb00be; }
     #tppoCard h2 { color: #961a1a; }
-    #finalCard h2 { color: #ffd54f; text-shadow: 0 0 6px rgba(255,213,79,0.4);}
+    #finalCard h2 { color: #ffd54f; text-shadow: 0 0 6px rgba(255,213,79,0.4); }
     #resultsCard h2 { color: #e57373; }
+
     #resultsCard td {
       font-size: 18px;
       font-weight: 600;
@@ -130,41 +131,18 @@ async function fetchRange(sheet, range) {
   return await res.json();
 }
 
-// Generate colours dynamically
-function generateTeamColours(teams) {
-  const colours = {};
-  const total = teams.length;
-
-  teams.forEach((team, i) => {
-    const hue = Math.floor((i / total) * 360);
-    colours[team] = `hsl(${hue}, 65%, 55%)`;
-  });
-
-  return colours;
-}
-
-// Standard grid renderer (with team colours)
-function renderGrid(data, TEAM_COLOURS = {}) {
+// Standard grid renderer
+function renderGrid(data) {
 
   data = data.filter(row => row.some(cell => cell !== ""));
 
   let html = "<table>";
 
-  data.forEach(row => {
+  data.forEach((row) => {
     html += "<tr>";
 
     row.forEach(cell => {
-
-      let style = "text-align:center;";
-
-      if (TEAM_COLOURS[cell]) {
-        style += `
-          color:${TEAM_COLOURS[cell]};
-          font-weight:bold;
-        `;
-      }
-
-      html += `<td style="${style}">${cell ?? ""}</td>`;
+      html += `<td>${cell ?? ""}</td>`;
     });
 
     html += "</tr>";
@@ -174,8 +152,8 @@ function renderGrid(data, TEAM_COLOURS = {}) {
   return html;
 }
 
-// Special renderer for semis
-function renderSemis(data, TEAM_COLOURS = {}) {
+// 🆕 RESULTS RENDERER (NEW STEP 1 IMPLEMENTATION)
+function renderResults(data) {
 
   data = data.filter(row => row.some(cell => cell !== ""));
 
@@ -188,19 +166,20 @@ function renderSemis(data, TEAM_COLOURS = {}) {
 
       let style = "text-align:center;";
 
-      if (TEAM_COLOURS[cell]) {
-        style += `
-          color:${TEAM_COLOURS[cell]};
-          font-weight:bold;
-        `;
-      }
-
-      // Apply heading style to row 1 and 3
-      if (i === 0 || i === 2) {
+      // Rows 1,3,5,7 → heading style
+      if (i % 2 === 0) {
         style += `
           font-weight:bold;
           color:#bbb;
           border-bottom:2px solid #444;
+        `;
+      }
+
+      // Rows 2,4,6,8 → emphasis style
+      if (i % 2 === 1) {
+        style += `
+          font-weight:800;
+          font-size:18px;
         `;
       }
 
@@ -214,7 +193,7 @@ function renderSemis(data, TEAM_COLOURS = {}) {
   return html;
 }
 
-// Load dashboard
+// Load all sections
 async function loadDashboard() {
   try {
     const matches = await fetchRange("MATCHES_PLAYED", "A1:I13");
@@ -225,19 +204,15 @@ async function loadDashboard() {
     const final = await fetchRange("FINAL", "A2:E2");
     const results = await fetchRange("RESULTS", "A1:A8");
 
-    // 🔥 NEW: get teams dynamically
-    const teamsRaw = await fetchRange("TEAMS", "A2:A20");
-    const teams = teamsRaw.flat().filter(t => t);
+    document.getElementById("matches").innerHTML = renderGrid(matches);
+    document.getElementById("groupA").innerHTML = renderGrid(groupA);
+    document.getElementById("groupB").innerHTML = renderGrid(groupB);
+    document.getElementById("semis").innerHTML = renderGrid(semis);
+    document.getElementById("tppo").innerHTML = renderGrid(tppo);
+    document.getElementById("final").innerHTML = renderGrid(final);
 
-    const TEAM_COLOURS = generateTeamColours(teams);
-
-    document.getElementById("matches").innerHTML = renderGrid(matches, TEAM_COLOURS);
-    document.getElementById("groupA").innerHTML = renderGrid(groupA, TEAM_COLOURS);
-    document.getElementById("groupB").innerHTML = renderGrid(groupB, TEAM_COLOURS);
-    document.getElementById("semis").innerHTML = renderSemis(semis, TEAM_COLOURS);
-    document.getElementById("tppo").innerHTML = renderGrid(tppo, TEAM_COLOURS);
-    document.getElementById("final").innerHTML = renderGrid(final, TEAM_COLOURS);
-    document.getElementById("results").innerHTML = renderGrid(results, TEAM_COLOURS);
+    // UPDATED
+    document.getElementById("results").innerHTML = renderResults(results);
 
   } catch (err) {
     console.error("Dashboard error:", err);
@@ -247,7 +222,7 @@ async function loadDashboard() {
 // Initial load
 loadDashboard();
 
-// Auto-refresh
+// Auto-refresh every 10 seconds
 setInterval(loadDashboard, 10000);
 </script>
 
